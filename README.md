@@ -12,3 +12,9 @@ bash qc.bsh
 ```
 
 ### Population structure and ancestry inference
+
+```bash
+bash dst.bsh
+```
+
+## Imputation
