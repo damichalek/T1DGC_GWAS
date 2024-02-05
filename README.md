@@ -1,10 +1,14 @@
 # T1DGC: A multi-ancestry GWAS of type 1 diabetes
-GWAS of AFR, AMR, EUR ancestry individuals. 
+Genome-wide association study of type 1 diabetes in AFR, AMR, EUR ancestry individuals. 
 
 ## Data
-Data were genotyped using the Illumina HumanCoreExome BeadArray.
+All samples were genotyped using the Illumina Infinium CoreExome BeadChip in the Genome Sciences Laboratory at the University of Virginia.
 
-## QC
-Sample and SNP level QC on the genotype array data were performed by Wei-Min Chen. </br>
+### QC
+Raw genotyped data were subjected to SNP-level and sample-level quality control using KING software (version 2.2.8). </br>
 
-## Population structure and ancestry inference
+```bash
+bash qc.bsh
+```
+
+### Population structure and ancestry inference
