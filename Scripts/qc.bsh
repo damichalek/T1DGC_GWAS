@@ -1,0 +1,278 @@
+#!/bin/bash
+
+echo "QC pipeline for T1DGC Humancore Exome data, Sept 10, 2019, by Wei-Min Chen"
+
+PLINK=plink1.9
+KING=king
+logfile=qc.log
+date > $logfile
+nickname=T1DGC_Exome
+finalpath=../QC_Final
+finalpath2=$finalpath/Extra
+sampledropfile0=$finalpath/${nickname}_sampletoberemoved0.txt
+updateidfile0=$finalpath/${nickname}_updateids0.txt
+sampledropfile=$finalpath/${nickname}_sampletoberemoved.txt
+sampleswapfile=$finalpath/${nickname}_sampletobeswapped.txt
+sedfile=$finalpath/${nickname}_sedfile.txt
+snpdropfile=$finalpath/${nickname}_snptoberemoved.txt
+updatefamfile=$finalpath/${nickname}_updatefam.txt
+covfile=$finalpath/${nickname}_cov.txt
+finalname=t1dgc
+keyfile=qc_key.txt
+
+datapath=/m/jdrfdn_scratch/users/wc9c/project/T1DGC/data
+phenofile=$datapath/QCdata/combined_pheno.txt
+rawgeno=$datapath/QCdata/t1dgcraw
+refgeno=$datapath/QCdata/mega4
+
+if [ ! -d $finalpath ]; then
+  mkdir $finalpath
+  cp $rawgeno.fam $finalpath/
+  cp $rawgeno.bim $finalpath/
+  cp $rawgeno.bed $finalpath/
+  mkdir $finalpath2
+fi
+
+echo "FID IID REASON" | sed "s/ /\t/g" > $sampledropfile
+echo "SNP REASON" | sed "s/ /\t/g" > $snpdropfile
+
+echo -e
+step=0
+echo "Step $step: Summary of raw data"
+date
+nout=$(cat $rawgeno.fam | wc -l)
+nout2=$(cat $rawgeno.bim | wc -l)
+echo "There are $nout samples with $nout2 SNPs in the raw data $rawgeno"
+
+echo -e
+step=1
+nextstep=$(($step+1))
+echo "Step $step: Remove intentional duplicates"
+date
+grep "_" $rawgeno.fam | awk '{print $2}' > tmp1_dup.txt
+sed "s/_/ /g" tmp1_dup.txt | awk '{print $1}' > tmp2_dup.txt
+paste tmp1_dup.txt tmp2_dup.txt > tmp2_dupkey.txt
+cat tmp2_dupkey.txt > tmp_dupkey.txt
+awk '{print $2, $2}' tmp2_dupkey.txt | uniq > tmp_uniqdup.txt
+cat tmp_uniqdup.txt >> tmp_dupkey.txt
+$PLINK --bfile $rawgeno --missing --out tmp_raw &>> $logfile         
+awk 'BEGIN{while((getline<"tmp_raw.imiss")>0)l[$2]=$0}$1 in l{print $0"\t"l[$1]}' tmp_dupkey.txt | awk '{print $1, $2, $8}' | sort -k3 -r > tmp3_dup.txt
+awk 'BEGIN{while((getline<"tmp3_dup.txt")>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_uniqdup.txt | awk '{print $3, $2}' > tmp_iid_duptobekept.txt
+awk '{print $1, "RM"}' tmp_dupkey.txt > tmp_flag.txt
+awk '{print $1, "KP"}' tmp_iid_duptobekept.txt >> tmp_flag.txt
+awk 'BEGIN{while((getline<"tmp_flag.txt")>0)l[$1]=$0}$1 in l{print $0"\t"l[$1]}' tmp_dupkey.txt | awk '$NF=="RM"' | awk '{print $1, $2}' > tmp2_duptoberemoved.txt
+awk -v file=$rawgeno.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$1 in l{print $0"\t"l[$1]}' tmp2_duptoberemoved.txt | awk '{print $3, $1}' > tmp_qc${step}_duptoberemoved.txt
+awk -v file=$rawgeno.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$1 in l{print $0"\t"l[$1]}' tmp_iid_duptobekept.txt | awk '{print $3, $1, $2}' > tmp2_updateids.txt
+awk -v file=$rawgeno.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$3 in l{print $0"\t"l[$3]}' tmp2_updateids.txt | awk '{print $1, $2, $4, $3}' > tmp_qc${step}_updateids.txt
+$PLINK --bfile $rawgeno --remove tmp_qc${step}_duptoberemoved.txt --make-bed --out tmp_qc${step}b &>> $logfile
+$PLINK --bfile tmp_qc${step}b --update-ids tmp_qc${step}_updateids.txt --make-bed --out tmp_qc$nextstep &>> $logfile
+echo "FID IID REASON" | sed "s/ /\t/g" > $sampledropfile0
+awk '{print $1, $2, "Duplicate"}' tmp_qc${step}_duptoberemoved.txt | sed "s/ /\t/g" >> $sampledropfile0
+cat tmp_qc${step}_updateids.txt | sed "s/ /\t/g" > $updateidfile0
+awk '{print $1, $2, $1, $2}' tmp_qc${step}b.fam > tmp_qc${step}_key.txt
+cat $updateidfile0 >> tmp_qc${step}_key.txt
+awk -v file=tmp_qc${step}_key.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_qc${step}b.fam | awk '{print $1, $2, $(NF-1), $NF}' > $keyfile
+
+echo -e
+step=2
+nextstep=$(($step+1))
+echo "Step $step: Match Humancore Exome with ImmunoChip" 
+date
+command="/m/jdrfdn_scratch/users/wc9c/KING/addon/samenamematch.bsh tmp_qc$step $refgeno Exome"
+echo "$command"
+$command &>> $logfile
+
+matchfile=Exome_matchstatus_RM.txt
+localdropfile=tmp_qc${step}_sampletoberemoved.txt
+echo -n > $localdropfile
+$KING -b tmp_qc$step.bed --autoQC --prefix tmp_qc$step >> $logfile
+awk -v file=tmp_qc${step}_autoQC_sampletoberemoved.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$1 in l{print $0"\t"l[$1]}' Exome_matchstatus.txt > $matchfile
+grep "NOMATCH_NameInRef" $matchfile | awk '{print $1, $2, $NF}' > tmp_drop_nomatch.txt
+echo "$(cat tmp_drop_nomatch.txt | wc -l) samples with match status NOMATCH_NameInRef are to be removed"
+cat tmp_drop_nomatch.txt >> $localdropfile
+grep "NOMATCH_NameNotInRef" $matchfile | awk '{print $1, $2, $NF}' > tmp_drop_nomatch.txt
+echo "$(cat tmp_drop_nomatch.txt | wc -l) samples with match status NOMATCH_NameNotInRef are to be removed"
+cat tmp_drop_nomatch.txt >> $localdropfile
+awk '{print $1}' tmp_Exome_mismatch_RM.txt | sort | uniq > tmp_drop_iid.txt
+echo "$(cat tmp_drop_iid.txt | wc -l) samples with match status MISMATCH are to be removed"
+awk -v file=tmp_qc$step.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$1 in l{print $0"\t"l[$1]}' tmp_drop_iid.txt | awk '{print $2, $1, "MISMATCH"}' >> $localdropfile
+awk -v file=tmp_qc$step.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$1 in l{print $0"\t"l[$1]}' tmp_Exome_mismatch_Update.txt | awk '{print $3, $1, $2}' > tmp_updateids.txt
+awk -v file=$refgeno.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$3 in l{print $0"\t"l[$3]}' tmp_updateids.txt | awk '{print $1, $2, $4, $3}' > $sampleswapfile
+echo "$(cat $sampleswapfile | wc -l) samples with match status MISMATCH are to be swapped/updated"
+awk -v file=tmp_qc$step.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' $sampleswapfile | awk '{print $5, $6, $7, $8, $9, $10, $4}' > tmp1_swap.txt
+awk -v file=$refgeno.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$7 in l{print $0"\t"l[$7]}' tmp1_swap.txt | awk '{print $1, $2, $3, $4, $5, $6, $8, $9, $10, $11, $12, $13}' > tmp2_swap.txt 
+awk '{printf("s/^%s %s %s %s %s %s/TEMP%s %s %s %s %s %s/\n", $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)}' tmp2_swap.txt > tmp_qc${nextstep}_sedfile.txt
+$PLINK --bfile tmp_qc$step --remove $localdropfile --make-bed --out tmp_qc$nextstep &>> $logfile
+awk -v file=$keyfile 'BEGIN{while((getline<file)>0)l[$4]=$0}$2 in l{print $0"\t"l[$2]}' $localdropfile | awk '{print $4, $5, $3}' | sed "s/ /\t/g" >> $sampledropfile0
+cat tmp_qc${nextstep}_sedfile.txt > $sedfile
+
+echo -e
+step=3
+nextstep=$(($step+1))
+echo "Step $step: Update mix-up samples with corrected IDs"
+date
+sed -f tmp_qc${step}_sedfile.txt tmp_qc$step.fam > tmp1_qc$step.fam
+sed "s/^TEMP//g" tmp1_qc$step.fam > tmp2_qc$step.fam
+$PLINK --bfile tmp_qc$step --fam tmp2_qc$step.fam --make-bed --out tmp_qc$nextstep &>> $logfile
+
+echo -e
+step=4
+nextstep=$(($step+1))
+echo "Step $step: autoQC on QCed data"
+date
+$KING -b tmp_qc$step.bed --autoQC --rplot --prefix tmp_qc$step >> $logfile
+awk '$NF=="MissingMoreThan5"' tmp_qc${step}_autoQC_sampletoberemoved.txt > tmp_qc${step}_sampletoberemoved.txt
+$PLINK --bfile tmp_qc${step} --remove tmp_qc${step}_sampletoberemoved.txt --exclude tmp_qc${step}_autoQC_snptoberemoved.txt --make-bed --out tmp_qc$nextstep &>> $logfile
+cat tmp_qc${step}_sampletoberemoved.txt | sed "s/ /\t/g" >> $sampledropfile
+awk 'NR>1' tmp_qc${step}_autoQC_snptoberemoved.txt | sed "s/ /\t/g" >> $snpdropfile
+
+echo -e
+step=5
+nextstep=$(($step+1))
+echo "Step $step: Update pedigrees"
+date
+sed "s/\r//g" $phenofile | awk 'NR>1' | awk '{print $3, $3, $2, $3}' | sort | uniq > tmp_qc${step}_updateids.txt
+awk -v file=tmp_qc${step}_updateids.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_qc${step}.fam | awk '{print $1, $2, $(NF-1), $NF}' > $keyfile 
+awk -v file=$phenofile 'BEGIN{while((getline<file)>0)l[$3]=$0}$2 in l{print $0"\t"l[$2]}' tmp_qc${step}.fam | awk '{print $8, $9, $10, $11, $12, $13}' > tmp_qc${step}b.fam
+$PLINK --bfile tmp_qc$step --fam tmp_qc${step}b.fam --make-bed --out tmp_qc$nextstep &>> $logfile
+cat $datapath/QCdata/imchip.cov > tmp_qc$nextstep.cov
+$KING -b tmp_qc$nextstep.bed --related --degree 2 --rplot --prefix tmp_qc$nextstep >> $logfile
+
+echo -e
+step=6
+nextstep=$(($step+1))
+echo "Step $step: Remove MI errors"
+date
+$PLINK --bfile tmp_qc$step --remove $datapath/QCdata/manual_MIsampletoberemoved.txt --update-parents $datapath/QCdata/manual_updateparents.txt --make-bed --out tmp_qc${step}b &>> $logfile
+$KING -b tmp_qc${step}b.bed --autoQC --prefix tmp_qc${step}b >> $logfile
+$PLINK --bfile tmp_qc${step}b --exclude tmp_qc${step}b_autoQC_snptoberemoved.txt --make-bed --out tmp_qc$nextstep &>> $logfile
+awk 'NR>1' tmp_qc${step}b_autoQC_snptoberemoved.txt | sed "s/ /\t/g" >> $snpdropfile
+cat tmp_qc$step.cov > tmp_qc$nextstep.cov
+cat $datapath/QCdata/manual_cov.txt >> tmp_qc$nextstep.cov
+$KING -b tmp_qc$nextstep.bed --related --deg 2 --prefix tmp_qc$nextstep --rplot >> $logfile
+awk -v file=$keyfile 'BEGIN{while((getline<file)>0)l[$4]=$0}$2 in l{print $0"\t"l[$2]}' $datapath/QCdata/manual_MIsampletoberemoved.txt | awk '{print $3, $4, "MIerror"}' | sed "s/ /\t/g" >> $sampledropfile
+
+echo -e
+step=7
+nextstep=$(($step+1))
+echo "Step $step: Build Pedigrees"  
+date
+$KING -b tmp_qc$step.bed --build --prefix tmp_qc$step --rplot >> $logfile
+$PLINK --bfile tmp_qc$step --update-ids tmp_qc${step}updateids.txt --make-bed --out tmp_qc${step}a &>> $logfile
+$PLINK --bfile tmp_qc${step}a --update-parents tmp_qc${step}updateparents.txt --make-bed --out tmp_qc$nextstep &>> $logfile
+cat $keyfile > tmp_qc${step}_key.txt 
+awk -v file=tmp_qc${step}updateids.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$4 in l{print $0"\t"l[$4]}' tmp_qc${step}_key.txt | awk '{print $1, $2, $(NF-1), $NF}' > tmp2_qc${step}_key.txt
+cat tmp2_qc${step}_key.txt >> tmp_qc${step}_key.txt
+cat $keyfile > tmp3_qc${step}_key.txt
+awk -v file=tmp_qc${step}_key.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp3_qc${step}_key.txt | awk '{print $1, $2, $(NF-1), $NF}' > $keyfile
+
+cat tmp_qc$step.cov > tmp_qc$nextstep.cov 
+awk -v file=tmp_qc${step}updateids.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_qc$nextstep.cov | awk '{print $6, $7, $3}' >> tmp_qc$nextstep.cov
+$KING -b tmp_qc$nextstep.bed --related --deg 2 --rplot --prefix tmp_qc$nextstep >> $logfile
+cp tmp_qc${step}_buildplot.pdf $finalpath2/${finalname}_QC_buildplot.pdf
+cp tmp_qc${nextstep}_MIerrorplot.pdf $finalpath2/${finalname}_QC_MIerrorplot.pdf
+echo "FID IID MZTWIN" > $covfile
+awk -v file=$keyfile 'BEGIN{while((getline<file)>0)l[$4]=$0}$2 in l{print $0"\t"l[$2]}' tmp_qc$nextstep.cov | awk '{print $4, $5, $3}' >> $covfile
+
+echo -e
+step=8
+nextstep=$((${step}+1))
+echo "Step $step: Prepare best quality samples"
+date
+$KING -b tmp_qc$step.bed --bysample --prefix tmp_qc${step} >> $logfile
+awk 'NR > 1 && $7 > 0.01' tmp_qc${step}bySample.txt | awk '{print $1,$2}' > lessthan99.txt
+$PLINK --bfile tmp_qc${step} --remove lessthan99.txt --make-bed --out tmp_qc${nextstep} &>> $logfile 
+cp tmp_qc$step.cov tmp_qc${nextstep}.cov
+nout=$(cat lessthan99.txt | wc -l)
+echo "# samples to be temporarily dropped from the following SNP-level QC step due to call rate < 99% is $nout"
+
+echo -e
+step=9
+nextstep=$((${step}+1))
+laststep=$((${step}-1))
+echo "Step $step: Remove poor quality SNPs in best quality samples"
+date
+snpqcfile="tmp_qc${step}bySNP.txt"
+$KING -b tmp_qc${step}.bed --cluster --bySNP --prefix tmp_qc${step} >> $logfile      
+callrate=$(head -n1 $snpqcfile | sed 's/ /\n/g'| awk '$0 ~/^CallRate$/ {print NR}')
+chr=$(head -n1 $snpqcfile| sed 's/ /\n/g'| awk '$0 ~/^Chr$/ {print NR}')
+af=$(head -n1 $snpqcfile| sed 's/ /\n/g'| awk '$0 ~/^Freq_A$/ {print NR}')   
+awk -v cr=$callrate -v chr=$chr '$cr < 0.95 && $chr!="Y"' $snpqcfile | awk '{print $1}' > lowcallrateSNP.txt
+nout=$(cat lowcallrateSNP.txt | wc -l)
+echo "# SNPs to be removed due to call rate < 95% is $nout"
+awk 'NR>1 && $13>1 && ($15>0.01||$16>0.1)' $snpqcfile | awk '{print $1}' > poorSNPinDuplicate.txt
+nout=$(cat poorSNPinDuplicate.txt | wc -l)
+echo "# SNPs to be removed due to not concordant in duplicates (error rate>1% or adjusted error rate>10%) is $nout"
+awk 'NR>1 && $19>1 && ($20>0.01||$21>0.1)' $snpqcfile | awk '{print $1}' > poorSNPinPO.txt
+nout=$(cat poorSNPinPO.txt | wc -l)
+echo "# SNPs to be removed due to MI in POs is $nout"
+awk 'NR>1 && $24>1 && ($25>0.01||$26>0.1)' $snpqcfile | awk '{print $1}' > poorSNPinTrio.txt
+nout=$(cat poorSNPinTrio.txt | wc -l)
+echo "# SNPs to be removed due to MI in trios is $nout"
+awk -v "cr=$callrate" -v "af=$af" '($af<=0.01||$af>=0.99)&&($cr<=0.99&&$cr>=0.95)' $snpqcfile | awk '{print $1}' > lowcallrateRareSNP.txt
+awk -v "cr=$callrate" -v "af=$af" '($af>0.01&&$af<0.05) && ($cr<1-$6)' $snpqcfile | awk '{print $1}' >> lowcallrateRareSNP.txt
+awk -v "cr=$callrate" -v "af=$af" '($af<0.99&&$af>0.95) && ($cr<$6)' $snpqcfile | awk '{print $1}' >> lowcallrateRareSNP.txt
+nout=$(cat lowcallrateRareSNP.txt | wc -l)
+echo "# SNPs to be removed due to low call rate in rare variants $nout"
+
+localdropfile=tmp_qc${step}_snptoberemoved.txt
+echo -n > $localdropfile
+awk '{print $1, "CallRateLessThanAlleleFrq"}' lowcallrateRareSNP.txt >> $localdropfile
+awk '{print $1, "MendelInconsistency"}' poorSNPinPO.txt >> $localdropfile
+awk '{print $1, "MendelInconsistency"}' poorSNPinTrio.txt >> $localdropfile
+awk '{print $1, "ConcordantRateLessThan99"}' poorSNPinDuplicate.txt >> $localdropfile
+awk '{print $1, "CallRateLessThan95"}' lowcallrateSNP.txt >> $localdropfile
+awk '{print $1}' $localdropfile | sort | uniq > tmp_qc${step}_uniqdrop.txt
+awk -v file=$localdropfile 'BEGIN{while((getline<file)>0)l[$1]=$0}$1 in l{print $0"\t"l[$1]}' tmp_qc${step}_uniqdrop.txt | awk '{print $1, $NF}' | sed "s/ /\t/g" >> $snpdropfile
+$PLINK --bfile tmp_qc$laststep --exclude $localdropfile --make-bed --out tmp_qc${nextstep} &>> $logfile
+
+echo -e
+step=10
+nextstep=$((${step}+1))
+echo "Step $step: Population structure analysis"
+date
+$KING -b $datapath/QCdata/KGref,tmp_qc${step} --mds --proj --rplot --prefix tmp_qc${step} >> $logfile
+awk '$5=="EUR"' tmp_qc${step}_InferredAncestry.txt | awk '{print $1, $2}' > tmp_qc${step}_eurlist.txt
+$PLINK --bfile tmp_qc${step} --keep tmp_qc${step}_eurlist.txt --make-bed --out tmp_qc${step}_euronly &>> $logfile
+$KING -b $datapath/QCdata/KGeurref,tmp_qc${step}_euronly --mds --proj --rplot --prefix tmp_qc${step}_euronly >> $logfile
+awk '$5=="NEUR"' tmp_qc${step}_euronly_InferredAncestry.txt | awk '{print $1, $2}' > tmp_keeplist.txt
+awk -v file=tmp_qc${step}.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_keeplist.txt | awk '$NF==1' | awk '{print $1, $2}' > keeplist.txt
+nout=$(cat keeplist.txt | wc -l)
+echo "# samples to be used for HWE checking is $nout"
+$PLINK --bfile tmp_qc${step} --keep keeplist.txt --make-bed --out tmp_qc${step}c &>> $logfile
+$KING -b tmp_qc${step}c.bed --unrelated --prefix tmp_qc${step}c >> $logfile
+$PLINK --bfile tmp_qc${step} --keep tmp_qc${step}cunrelated.txt --hwe 0.000001 --hardy --out tmp_qc${step}c &>> $logfile
+cat tmp_qc${step}.bim > NE1.bim
+echo $(head -n1 tmp_qc${step}c.hwe) "POS"  > NE2pos.hwe
+awk 'BEGIN{while((getline<"NE1.bim")>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_qc${step}c.hwe | awk '{print $1,$2,$3,$4,$5,$6,$7,$8,$9,$13}' >> NE2pos.hwe
+grep "ALL" NE2pos.hwe | awk '$9 < 1E-6'| awk '{if($1==6 && $NF>24482000 && $NF<33859000){if($9<1E-20){print $2}}else{print $2}}'>hweSNP_20.txt
+nout=$(cat hweSNP_20.txt | wc -l)
+echo "# SNPs to be removed due to HWE P<1E-6 (or <1E-20 for MHC) is $nout"
+awk '{print $1, "HWDInEUR"}' hweSNP_20.txt | sed "s/ /\t/g" >> $snpdropfile
+$PLINK --bfile tmp_qc$step --exclude hweSNP_20.txt --make-bed --out $finalname &>> $logfile
+cp tmp_qc${step}_ancestryplot.pdf $finalpath2/${finalname}_QC_ancestryplot.pdf
+cp tmp_qc${step}_euronly_ancestryplot.pdf $finalpath2/${finalname}_QC_eur_ancestryplot.pdf
+cp tmp_qc${step}_InferredAncestry.txt $finalpath2/${finalname}_QC_InferredAncestry.txt
+cp tmp_qc${step}_euronly_InferredAncestry.txt $finalpath2/${finalname}_QC_eur_InferredAncestry.txt
+
+echo -e
+nout=$(awk 'NR>1' $sampledropfile | wc -l)
+echo "List of samples to be removed (N=${nout}) is saved in $sampledropfile"
+nout=$(awk 'NR>1' $snpdropfile | wc -l)
+echo "List of SNPs to be removed (N=${nout}) is saved in $snpdropfile"
+nout=$(cat $finalname.fam | wc -l)
+nout2=$(cat $finalname.bim | wc -l)
+echo "There are $nout samples with $nout2 SNPs in the final dataset $finalname"  
+awk -v file=$finalname.fam 'BEGIN{while((getline<file)>0)l[$2]=$0}$4 in l{print $0"\t"l[$4]}' $keyfile | awk '{print $1, $2, $5, $6, $7, $8, $9, $10}' > $updatefamfile  
+echo "FID IID MZTWIN" > $finalname.cov
+awk -v file=$keyfile 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' $covfile | awk '{print $6, $7, $3}' >> $finalname.cov 
+echo "Pedigree update file is in $updatefamfile"
+cp $finalname.fam $finalpath2/
+cp $finalname.bim $finalpath2/
+cp $finalname.bed $finalpath2/
+cp $finalname.cov $finalpath2/
+echo "QCed data and QC plots are in $finalpath2"
+cp $datapath/script/install.bsh $finalpath/ 
+echo "Or alternatively, in $finalpath, type ./install.bsh to generate cleaned dataset yourself"
+time=$(date)
+echo "QC is done at $time"
