@@ -10,8 +10,8 @@ finalname=T1DGC_HCE
 
 # genotyped final release data
 
-geno=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
-geno_pc=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20/PCs_plink
+geno=$HOME/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+geno_pc=$HOME/data/T1DGC_Humancore_Exome/Data_release-2021-01-20/PCs_plink
 
 echo -e
 step=7
