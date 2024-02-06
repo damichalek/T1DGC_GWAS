@@ -4,8 +4,8 @@ echo "Filter Imputed data for T1DGC Humancore Exome data, Feb 9, 2021, by Domini
 
 PLINK=plink1.9
 KING=king
-KING14=$HOME/KING14/king
-METAL=$HOME/METAL/generic-metal/metal
+KING14=/m/CPHG/T1DGC/USERS/dam8mt/KING14/king
+METAL=/m/CPHG/T1DGC/USERS/dam8mt/METAL/generic-metal/metal
 PERL=perl
 logfile=imp_da.log
 date > $logfile
@@ -19,23 +19,23 @@ releaseccAFR=${finalname}_cc_AFR-2021-01-20
 releaseccAMR=${finalname}_cc_AMR-2021-01-20
 release=${finalname}-2021-01-20
 
-imputedAFR=$HOME/data/T1DGC_Humancore_Exome/Imputation/AFR
-imputedAMR=$HOME/data/T1DGC_Humancore_Exome/Imputation/AMR
-imputedFam=$HOME/data/T1DGC_Humancore_Exome/Imputation/Family
-imputed=$HOME/data/T1DGC_Humancore_Exome/Imputation/${finalname}
+imputedAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/AFR
+imputedAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/AMR
+imputedFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Family
+imputed=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/${finalname}
 
-filterAFR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_AFR
-filterAMR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_AMR
-filterFam=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_Family
-filter=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_${finalname}
+filterAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_AFR
+filterAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_AMR
+filterFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_Family
+filter=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_${finalname}
 
 # These are the imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants)
-updAFR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AFR
-updAMR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AMR
-updFam=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Family
-upd=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_${finalname}
+updAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AFR
+updAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AMR
+updFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Family
+upd=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_${finalname}
 
-imp=$HOME/data/T1DGC_Humancore_Exome/Imputation/Temp_Imputed
+imp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Temp_Imputed
 
 echo -e
 step=5
