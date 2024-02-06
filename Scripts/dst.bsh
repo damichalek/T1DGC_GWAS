@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Downstream analysis for T1DGC Humancore Exome data (ancestry inference, qc), Oct 12, 2020, by Dominika Michalek"
+echo "Downstream analysis for T1DGC Humancore Exome genotyped data (ancestry inference, qc), Oct 12, 2020, by Dominika Michalek"
 
 PLINK=plink1.9
 KING=king
