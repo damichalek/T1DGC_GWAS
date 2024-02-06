@@ -1,0 +1,197 @@
+#!/bin/bash
+
+echo "Filter imputed data for T1DGC Humancore Exome data with MI < 0.1 , Mar 4, 2022, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+KING14=/m/CPHG/T1DGC/USERS/dam8mt/KING14/king
+METAL=/m/CPHG/T1DGC/USERS/dam8mt/METAL/generic-metal/metal
+logfile=imp_mi.log
+date > $logfile
+finalname=T1DGC_HCE
+
+# These are the imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants)
+updAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AFR
+updAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AMR
+updFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Family
+updPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Pseudo_cc
+upd=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_${finalname}
+
+temp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Temp
+temp_imp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Temp_Imputed
+
+imprelease=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/T1DGC
+impreleaseAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/AFR
+impreleaseAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/AMR
+impreleaseFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Family
+impreleasePCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Pseudo_cc
+
+
+echo -e
+step=1
+echo "Step $step: Check MI errors (imputed data, MAF > 0.01, R2 > 0.3 and MAF < 0.01, R2 > 0.5)"
+date
+
+# The same file as I has produced earlier
+# Just wanted to make sure, that I have the same number of SNPs in both
+cp $temp_imp/tmp_imp_da19_fam_bySNP_0.3_final_short.txt $temp/${finalname}_fam_mi_0.1.txt
+
+
+# Check MI error
+for i in {1..22}; do
+  $KING -b $updFam/Family_chr${i}.bed --bySNP --prefix tmp_imp_mi${step}_fam_chr${i}_ &>> $logfile
+done
+
+# Combine results across chromosomes
+awk 'NR==1' tmp_imp_mi${step}_fam_chr${i}_bySNP.txt > tmp_imp_mi${step}_fam_bySNP_0.3.txt
+for i in {1..22}; do
+  awk 'NR>1' tmp_imp_mi${step}_fam_chr${i}_bySNP.txt >> tmp_imp_mi${step}_fam_bySNP_0.3.txt
+done
+
+# File bySNP has multiple spaces between columns which makes difficult to use awk on that file.
+# gsub is used to substitute the same word on each row to enable awk command
+awk '{gsub("SNP","SNP",$1)}1' tmp_imp_mi${step}_fam_bySNP_0.3.txt | sed "s/ /\t/g" > tmp_imp_mi${step}_fam_bySNP_0.3_edit.txt
+awk '{gsub(":",":",$1)}1' tmp_imp_mi${step}_fam_bySNP_0.3_edit.txt | sed "s/ /\t/g" > tmp_imp_mi${step}_fam_bySNP_0.3_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $6, $21}' tmp_imp_mi${step}_fam_bySNP_0.3_final.txt | sed "s/ /\t/g" > tmp_imp_mi${step}_fam_bySNP_0.3_final_short.txt
+
+
+echo -e
+step=2
+step1=$((step-1))
+echo "Step $step: Extract SNPs with MI < 0.1 (imputed data, MAF > 0.01, R2 > 0.3 and MAF < 0.01, R2 > 0.5)"
+date
+
+# Based on GDT results we have chosen the MI error threshold (MI < 0.1) for SNPs in family, AFR and AMR data
+# no MAF filtering here 
+awk 'NR==1' tmp_imp_mi${step1}_fam_bySNP_0.3_final_short.txt > tmp_imp_mi${step}_fam_0.1.txt
+awk '$NF <0.1 {print $0}' tmp_imp_mi${step1}_fam_bySNP_0.3_final_short.txt | sed "s/ /\t/g" >> tmp_imp_mi${step}_fam_0.1.txt
+
+awk 'NR>1' tmp_imp_mi${step}_fam_0.1.txt | awk '{print $0}' | sed "s/ /\t/g" > tmp_imp_mi${step}_fam_0.1_edit.txt
+
+nout=$(cat tmp_imp_mi${step}_fam_0.1_edit.txt | wc -l)
+echo "There are $nout SNPs with MIerror < 0.1"
+
+# SNPs to be removed (MI > 0.1)
+awk '$NF >=0.1 {print $0}' tmp_imp_mi${step1}_fam_bySNP_0.3_final_short.txt | sed "s/ /\t/g" >> tmp_imp_mi${step}_fam_0.1_tbr.txt
+
+
+echo -e
+step=3
+step2=$((step-1))
+echo "Step $step: Update SNPs in AFR, AMR, fam and T1DGC_HCE files based on MI < 0.1 from family dataset (imputed data, MAF > 0.01, R2 > 0.3 and MAF < 0.01, R2 > 0.5)"
+date
+
+# These files contain only SNPs with and MI < 0.1 (MAF > 0.01, R2 > 0.3 and MAF < 0.01, R2 > 0.5)
+for i in {1..22}; do
+  $PLINK --bfile $updAFR/AFR_chr${i} --exclude tmp_imp_mi${step2}_fam_0.1_tbr.txt --make-bed --out tmp_imp_mi${step}_AFR_chr${i} &>> $logfile
+done
+
+for i in {1..22}; do
+  $PLINK --bfile $updAMR/AMR_chr${i} --exclude tmp_imp_mi${step2}_fam_0.1_tbr.txt --make-bed --out tmp_imp_mi${step}_AMR_chr${i} &>> $logfile
+done
+
+for i in {1..22}; do
+  $PLINK --bfile $updFam/Family_chr${i} --exclude tmp_imp_mi${step2}_fam_0.1_tbr.txt --make-bed --out tmp_imp_mi${step}_fam_chr${i} &>> $logfile
+done
+
+for i in {1..22}; do
+  $PLINK --bfile $updPCC/Pseudo_cc_chr${i} --exclude tmp_imp_mi${step2}_fam_0.1_tbr.txt --make-bed --out tmp_imp_mi${step}_pseudo_cc_chr${i} &>> $logfile
+done
+
+for i in {1..22}; do
+  $PLINK --bfile $upd/${finalname}_chr${i} --exclude tmp_imp_mi${step2}_fam_0.1_tbr.txt --make-bed --out tmp_imp_mi${step}_${finalname}_chr${i} &>> $logfile
+done
+
+# Copy all filtered imputed data to designated folder (Imputed_data_release-2022-03-04)
+for i in {1..22}; do
+  cp tmp_imp_mi${step}_AFR_chr${i}.fam $impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.fam
+  cp tmp_imp_mi${step}_AFR_chr${i}.bim $impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.bim
+  cp tmp_imp_mi${step}_AFR_chr${i}.bed $impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.bed
+done
+
+for i in {1..22}; do
+  cp tmp_imp_mi${step}_AMR_chr${i}.fam $impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.fam
+  cp tmp_imp_mi${step}_AMR_chr${i}.bim $impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.bim
+  cp tmp_imp_mi${step}_AMR_chr${i}.bed $impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.bed
+done
+
+for i in {1..22}; do
+  cp tmp_imp_mi${step}_fam_chr${i}.fam $impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.fam
+  cp tmp_imp_mi${step}_fam_chr${i}.bim $impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.bim
+  cp tmp_imp_mi${step}_fam_chr${i}.bed $impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.bed
+done
+
+for i in {1..22}; do
+  cp tmp_imp_mi${step}_pseudo_cc_chr${i}.fam $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.fam
+  cp tmp_imp_mi${step}_pseudo_cc_chr${i}.bim $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.bim
+  cp tmp_imp_mi${step}_pseudo_cc_chr${i}.bed $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.bed
+done
+
+for i in {1..22}; do
+  cp tmp_imp_mi${step}_${finalname}_chr${i}.fam $imprelease/T1DGC_HCE_imp_chr${i}.fam
+  cp tmp_imp_mi${step}_${finalname}_chr${i}.bim $imprelease/T1DGC_HCE_imp_chr${i}.bim
+  cp tmp_imp_mi${step}_${finalname}_chr${i}.bed $imprelease/T1DGC_HCE_imp_chr${i}.bed
+done
+
+
+echo -e
+step=4
+echo "Step $step: Merge imputed filtered data release (MAF > 0.01, R2 > 0.3 and MAF < 0.01, R2 > 0.5) into Imputed_data_release-2022-03-04"
+date
+
+### AFR
+# Make list of binary files to merge
+echo "$impreleaseAFR/T1DGC_HCE_imp_AFR_chr2.bed $impreleaseAFR/T1DGC_HCE_imp_AFR_chr2.bim $impreleaseAFR/T1DGC_HCE_imp_AFR_chr2.fam" | sed "s/ /\t/g" > tmp_me${step}_files_to_merge_AFR.txt
+
+for i in {3..22}; do
+  echo "$impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.bed $impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.bim $impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.fam" | sed "s/ /\t/g" >> tmp_me${step}_files_to_merge_AFR.txt
+done
+
+# Merge final clean AFR imputed data (R2 > 0.3, MI < 0.1, MAF > 0.01)
+$PLINK --bfile $impreleaseAFR/T1DGC_HCE_imp_AFR_chr1 --merge-list tmp_me${step}_files_to_merge_AFR.txt --make-bed --out $impreleaseAFR/T1DGC_HCE_imp_AFR &>> $logfile
+
+### AMR
+# Make list of binary files to merge
+echo "$impreleaseAMR/T1DGC_HCE_imp_AMR_chr2.bed $impreleaseAMR/T1DGC_HCE_imp_AMR_chr2.bim $impreleaseAMR/T1DGC_HCE_imp_AMR_chr2.fam" | sed "s/ /\t/g" > tmp_me${step}_files_to_merge_AMR.txt
+
+for i in {3..22}; do
+  echo "$impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.bed $impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.bim $impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.fam" | sed "s/ /\t/g" >> tmp_me${step}_files_to_merge_AMR.txt
+done
+
+# Merge final clean AMR imputed data (R2 > 0.3, MI < 0.1, MAF > 0.01)
+$PLINK --bfile $impreleaseAMR/T1DGC_HCE_imp_AMR_chr1 --merge-list tmp_me${step}_files_to_merge_AMR.txt --make-bed --out $impreleaseAMR/T1DGC_HCE_imp_AMR &>> $logfile
+
+### Family
+
+# Make list of binary files to merge
+echo "$impreleaseFam/T1DGC_HCE_imp_fam_chr2.bed $impreleaseFam/T1DGC_HCE_imp_fam_chr2.bim $impreleaseFam/T1DGC_HCE_imp_fam_chr2.fam" | sed "s/ /\t/g" > tmp_me${step}_files_to_merge_fam.txt
+
+for i in {3..22}; do
+  echo "$impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.bed $impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.bim $impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.fam" | sed "s/ /\t/g" >> tmp_me${step}_files_to_merge_fam.txt
+done
+
+# Merge final clean Family imputed data (R2 > 0.3, MI < 0.1, MAF > 0.01)
+$PLINK --bfile $impreleaseFam/T1DGC_HCE_imp_fam_chr1 --merge-list tmp_me${step}_files_to_merge_fam.txt --make-bed --out $impreleaseFam/T1DGC_HCE_imp_fam &>> $logfile
+
+### Pseudo-case control
+# Make list of binary files to merge
+echo "$impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr2.bed $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr2.bim $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr2.fam" | sed "s/ /\t/g" > tmp_me${step}_files_to_merge_pcc.txt
+
+for i in {3..22}; do
+  echo "$impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.bed $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.bim $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.fam" | sed "s/ /\t/g" >> tmp_me${step}_files_to_merge_pcc.txt
+done
+
+# Merge final clean Pseudo-case control imputed data (R2 > 0.3, MI < 0.1, MAF > 0.01)
+$PLINK --bfile $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr1 --merge-list tmp_me${step}_files_to_merge_pcc.txt --make-bed --out $impreleasePCC/T1DGC_HCE_imp_pseudo_cc &>> $logfile
+
+### T1DGC
+# Make list of binary files to merge
+echo "$imprelease/T1DGC_HCE_imp_chr2.bed $imprelease/T1DGC_HCE_imp_chr2.bim $imprelease/T1DGC_HCE_imp_chr2.fam" | sed "s/ /\t/g" > tmp_me${step}_files_to_merge_T1DGC.txt
+
+for i in {3..22}; do
+  echo "$imprelease/T1DGC_HCE_imp_chr${i}.bed $imprelease/T1DGC_HCE_imp_chr${i}.bim $imprelease/T1DGC_HCE_imp_chr${i}.fam" | sed "s/ /\t/g" >> tmp_me${step}_files_to_merge_T1DGC.txt
+done
+
+# Merge final clean T1DGC imputed data (R2 > 0.3, MI < 0.1, MAF > 0.01)
+$PLINK --bfile $imprelease/T1DGC_HCE_imp_chr1 --merge-list tmp_me${step}_files_to_merge_T1DGC.txt --make-bed --out $imprelease/T1DGC_HCE_imp &>> $logfile
