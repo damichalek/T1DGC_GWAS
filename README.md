@@ -38,7 +38,7 @@ bash imp_filter.bsh
 bash imp_mi.bsh
 
 # filter imputed VCF files with MI < 0.1
-bash imp_vcf.bs
+bash imp_vcf.bsh
 ```
 
 ## Association analyses
