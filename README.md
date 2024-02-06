@@ -37,7 +37,7 @@ bash pre_imputation.bsh
 2. Frailty mixed model regression in GATE for each ancestry group (AFR, AMR, EUR)
 3. Meta-analysis in METAL for both T1D risk and age at onset
 4. HLA association analyses in SAIGE and GATE
-5. HLA class II haplotypes (_DRB1_-_DQA1_-_DQB1_) analysis
+5. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
 
 ## FUMA
 1. SNP2GENE module
