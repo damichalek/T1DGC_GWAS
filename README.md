@@ -29,7 +29,7 @@ bash pca.bsh
 # uses Rayner perl script (HRC-1000G-check-bim-NoReadKey.pl)
 bash pre_imputation.bsh
 ```
-3. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) (1.5.7 and 1.6.6)and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!) (1.5.8)
+3. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) (1.5.7 and 1.6.6) and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!) (1.5.8)
 4. Download, unzip and filter imputation results
 
 ## Association analyses
