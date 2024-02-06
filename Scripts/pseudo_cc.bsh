@@ -10,7 +10,7 @@ date > $logfile
 finalname=T1DGC_HCE
 
 # genotyped final release data
-geno=$HOME/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+geno=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
 
 echo -e
 step=1
