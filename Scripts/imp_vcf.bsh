@@ -1,0 +1,219 @@
+#!/bin/bash
+
+echo "Filter VCF imputed data for T1DGC Humancore Exome data with MI < 0.1 , Mar 10, 2022, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+logfile=imp_vcf.log
+date > $logfile
+finalname=T1DGC_HCE
+
+# These are the VCF imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants)
+# before MI filtering
+filterAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_AFR
+filterAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_AMR
+filterFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_Family
+filterPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_Pseudo_cc
+filter=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_${finalname}
+
+# These are the PLINK imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants)
+# before MI filtering
+updAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AFR
+updAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AMR
+updFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Family
+updPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Pseudo_cc
+upd=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_${finalname}
+
+temp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Temp_VCF
+temp_imp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Temp_Imputed
+temp_pcc=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputation/Temp_Pseudo_cc
+
+# These are the PLINK imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants and MI < 0.1)
+# after MI filtering
+imprelease=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/T1DGC
+impreleaseAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/AFR
+impreleaseAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/AMR
+impreleaseFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Family
+impreleasePCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Pseudo_cc
+
+# These are the VCF imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants and MI < 0.1)
+# afetr MI filtering
+
+vcf=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/T1DGC
+vcfAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/AFR
+vcfAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/AMR
+vcfFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/Family # this one was made with bcftools
+vcfPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/Pseudo_cc
+
+# Final VCF file without 6 samples with 01_T/U and 02_T/U at the end (removed from genotyped data)
+finalvcfPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/Pseudo_cc/Final
+
+vcfAMR2=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/AMR2 # this one does not exist anymore, but was made with bcftools to compare
+vcfFam2=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/Family2 # this one was made with vcftools
+
+# All datasets in Filtered_AFR, Filtered_AMR, Filtered_Family, Filtered_Pseudo_cc, Filtered_T1DGC_HCE were tabixed, so no need to do that here, before filtering
+
+echo -e
+step=1
+echo "Step $step: Filter T1DGC_HCE (AFR + AMR + family) based on MI"
+date
+
+for i in {1..22}; do
+  awk '{print $2}' $imprelease/T1DGC_HCE_imp_chr${i}.bim > tmp_imp_vcf${step}_chr${i}_snp_keep_list.txt
+done
+
+# T1DGC_HCE - filters variants based on MI < 0.1 threshold
+#for i in {1..22}; do
+#  vcftools --gzvcf $filter/chr${i}.dose.filtered.vcf.gz --snps tmp_imp_vcf${step}_chr${i}_snp_keep_list.txt --recode --recode-INFO-all --stdout | bgzip > $vcf/T1DGC_HCE_imp_chr${i}.vcf.gz
+#done
+
+# faster than vcftools
+for i in {1..22}; do
+  bcftools view --include ID==@tmp_imp_vcf${step}_chr${i}_snp_keep_list.txt $filter/chr${i}.dose.filtered.vcf.gz -o $vcf/T1DGC_HCE_imp_chr${i}.vcf.gz -Oz
+done
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+for i in {1..22}; do
+  tabix -p vcf $vcf/T1DGC_HCE_imp_chr${i}.vcf.gz
+done
+
+# I will use also bcftools, in order to have .csi files
+for i in {1..22}; do
+  bcftools index -c $vcf/T1DGC_HCE_imp_chr${i}.vcf.gz
+done
+
+
+echo -e
+step=2
+echo "Step $step: Filter AFR based on MI"
+date
+
+for i in {1..22}; do
+  awk '{print $2}' $impreleaseAFR/T1DGC_HCE_imp_AFR_chr${i}.bim > tmp_imp_vcf${step}_AFR_chr${i}_snp_keep_list.txt
+done
+
+# AFR - filters variants based on MI < 0.1 threshold
+#for i in {1..22}; do
+#  vcftools --gzvcf $filterAFR/chr${i}.AFR.dose.filtered.vcf.gz --snps tmp_imp_vcf${step}_AFR_chr${i}_snp_keep_list.txt --recode --recode-INFO-all --stdout | bgzip > $vcfAFR/T1DGC_HCE_imp_AFR_chr${i}.vcf.gz
+#done
+
+# faster than vcftools
+for i in {1..22}; do
+  bcftools view --include ID==@tmp_imp_vcf${step}_AFR_chr${i}_snp_keep_list.txt $filterAFR/chr${i}.AFR.dose.filtered.vcf.gz -o $vcfAFR/T1DGC_HCE_imp_AFR_chr${i}.vcf.gz -Oz
+done
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+for i in {1..22}; do
+  tabix -p vcf $vcfAFR/T1DGC_HCE_imp_AFR_chr${i}.vcf.gz
+done
+
+# I will use also bcftools, in order to have .csi files
+for i in {1..22}; do
+  bcftools index -c $vcfAFR/T1DGC_HCE_imp_AFR_chr${i}.vcf.gz
+done
+
+echo -e
+step=3
+echo "Step $step: Filter AMR based on MI"
+date
+
+for i in {1..22}; do
+  awk '{print $2}' $impreleaseAMR/T1DGC_HCE_imp_AMR_chr${i}.bim > tmp_imp_vcf${step}_AMR_chr${i}_snp_keep_list.txt
+done
+
+# AMR - filters variants based on MI < 0.1 threshold
+#for i in {1..22}; do
+#  vcftools --gzvcf $filterAMR/chr${i}.AMR.dose.filtered.vcf.gz --snps tmp_imp_vcf${step}_AMR_chr${i}_snp_keep_list.txt --recode --recode-INFO-all --stdout | bgzip > $vcfAMR/T1DGC_HCE_imp_AMR_chr${i}.vcf.gz
+#done
+
+# faster than vcftools
+for i in {1..22}; do
+  bcftools view --include ID==@tmp_imp_vcf${step}_AMR_chr${i}_snp_keep_list.txt $filterAMR/chr${i}.AMR.dose.filtered.vcf.gz -o $vcfAMR/T1DGC_HCE_imp_AMR_chr${i}.vcf.gz -Oz
+done
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+for i in {1..22}; do
+  tabix -p vcf $vcfAMR/T1DGC_HCE_imp_AMR_chr${i}.vcf.gz
+done
+
+# I will use also bcftools, in order to have .csi files
+for i in {1..22}; do
+  bcftools index -c $vcfAMR/T1DGC_HCE_imp_AMR_chr${i}.vcf.gz
+done
+
+echo -e
+step=4
+echo "Step $step: Filter Family based on MI"
+date
+
+for i in {1..22}; do
+  awk '{print $2}' $impreleaseFam/T1DGC_HCE_imp_fam_chr${i}.bim > tmp_imp_vcf${step}_fam_chr${i}_snp_keep_list.txt
+done
+
+# Family - filters variants based on MI < 0.1 threshold
+#for i in {4..22}; do
+#  vcftools --gzvcf $filterFam/chr${i}.fam.dose.filtered.vcf.gz --snps tmp_imp_vcf${step}_fam_chr${i}_snp_keep_list.txt --recode --recode-INFO-all --stdout | bgzip > $vcfFam2/T1DGC_HCE_imp_fam_chr${i}.vcf.gz
+#done
+
+# bcftools is faster
+#for i in {1..22}; do
+#  bcftools view --include ID==@tmp_imp_vcf${step}_fam_chr${i}_snp_keep_list.txt $filterFam/chr${i}.fam.dose.filtered.vcf.gz -o $vcfFam/T1DGC_HCE_imp_fam_chr${i}.vcf.gz -Oz
+#done
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+for i in {1..22}; do
+  tabix -p vcf $vcfFam/T1DGC_HCE_imp_fam_chr${i}.vcf.gz
+done
+
+# I will use also bcftools, in order to have .csi files
+for i in {1..22}; do
+  bcftools index -c $vcfFam/T1DGC_HCE_imp_fam_chr${i}.vcf.gz
+done
+
+echo -e
+step=5
+echo "Step $step: Filter Pseudo-case control based on MI (VCF)"
+date
+
+for i in {1..22}; do
+  awk '{print $2}' $impreleasePCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.bim > tmp_imp_vcf${step}_pseudo_cc_chr${i}_snp_keep_list.txt
+done
+
+# Pseudo_cc - filters variants based on MI < 0.1 threshold
+# bcftools is faster
+for i in {1..22}; do
+  bcftools view --include ID==@tmp_imp_vcf${step}_pseudo_cc_chr${i}_snp_keep_list.txt $filterPCC/chr${i}.pseudo_cc.dose.filtered.vcf.gz -o $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.vcf.gz -Oz
+done
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+for i in {1..22}; do
+  tabix -p vcf $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.vcf.gz
+done
+
+# I will use also bcftools, in order to have .csi files
+for i in {1..22}; do
+  bcftools index -c $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.vcf.gz
+done
+
+# VCF files after imputation and filtering cosists of 6862 samples insetad of 6856
+# We removed 6 samples from genotyped data, which had 01_T/U or 02_T/U at the end and monomorphic SNPs
+# Hovewer, for imputation I used old file with 6862 samples and monomorphic SNPs
+# We decided to remove those 6 samples from vcf files 
+# (Wei Zhou mentioned that for SAIGE it does not matter that there is a different number of samples in VCF files) 
+# (most important is to have the desired number of samples for step 0 and step 1)
+
+echo -e
+step=6
+echo "Step $step: Remove 6 samples from Pseudo-case control dataset - final VCF file"
+date
+
+awk '{print $2}' $impreleasePCC/T1DGC_HCE_imp_pseudo_cc.fam > tmp_imp_vcf${step}_pseudo_cc_sample_list.txt
+
+for i in {1..22}; do
+  bcftools view --samples-file tmp_imp_vcf${step}_pseudo_cc_sample_list.txt $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.vcf.gz -o $finalvcfPCC/T1DGC_HCE_imp_pseudo_cc_chr${i}.vcf.gz -Oz
+done
