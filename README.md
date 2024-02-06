@@ -7,8 +7,10 @@ All samples were genotyped using the Illumina Infinium CoreExome BeadChip in the
 Raw genotyped underwent following steps:
 1. QC
 2. Population structure and ancestry inference
-3. Generation of pseudo-case pseudo-control
+3. Generation of pseudo-case pseudo-control individuals from family dataset
 4. PCA
+
+## Pre-imputation
 
 ## Imputation
 Genotyped data were imputed to TOPMed reference panel.
