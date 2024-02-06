@@ -20,7 +20,7 @@ bash dst.bsh
 ## Imputation
 1. Prepare data for imputation
 ```bash
-bash pre-imputation.bsh
+bash pre_imputation.bsh
 ```
 3. Impute data to TOPMed reference panel and HLA-TAPAS (chr6)
 4. Download, unzip and filter imputation results
