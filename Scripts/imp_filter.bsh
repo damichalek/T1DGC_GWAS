@@ -1,0 +1,124 @@
+#!/bin/bash
+
+echo "Filter Imputed data for T1DGC Humancore Exome data, Feb 9, 2021, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+KING14=$HOME/KING14/king
+METAL=$HOME/METAL/generic-metal/metal
+PERL=perl
+logfile=imp_da.log
+date > $logfile
+finalpath=../Imputed_Data_Analysis_Final
+finalpath2=$finalpath/Extra
+finalname=T1DGC_HCE
+releasepath=../../Data_release-2021-01-20
+releasefamily=${finalname}_family-2021-01-20
+releasecc=${finalname}_cc-2021-01-20
+releaseccAFR=${finalname}_cc_AFR-2021-01-20
+releaseccAMR=${finalname}_cc_AMR-2021-01-20
+release=${finalname}-2021-01-20
+
+imputedAFR=$HOME/data/T1DGC_Humancore_Exome/Imputation/AFR
+imputedAMR=$HOME/data/T1DGC_Humancore_Exome/Imputation/AMR
+imputedFam=$HOME/data/T1DGC_Humancore_Exome/Imputation/Family
+imputed=$HOME/data/T1DGC_Humancore_Exome/Imputation/${finalname}
+
+filterAFR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_AFR
+filterAMR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_AMR
+filterFam=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_Family
+filter=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_${finalname}
+
+# These are the imputed data (MAF > 0.01, R2 > 0.3 - common variants, MAF < 0.01, R2 > 0.5 rare variants)
+updAFR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AFR
+updAMR=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_AMR
+updFam=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_Family
+upd=$HOME/data/T1DGC_Humancore_Exome/Imputation/Filtered_upd_${finalname}
+
+imp=$HOME/data/T1DGC_Humancore_Exome/Imputation/Temp_Imputed
+
+echo -e
+step=5
+echo "Step $step: Tabix all datasets"
+date
+
+for i in {1..22}; do
+  tabix -p vcf $imputedAFR/chr${i}.dose.vcf.gz
+done
+
+for i in {1..22}; do
+  tabix -p vcf $imputedAMR/chr${i}.dose.vcf.gz
+done
+
+for i in {1..22}; do
+  tabix -p vcf $imputedFam/chr${i}.dose.vcf.gz
+done
+
+for i in {1..22}; do
+  tabix -p vcf $imputed/chr${i}.dose.vcf.gz
+done
+
+
+# Run the following step for all ancestries
+echo -e
+step=7
+echo "Step $step: Filter AFR based on R2"
+date
+
+# AFR - filters common and rare variants based on R2 and MAF
+if [ ! -d $filterAFR ]; then
+  mkdir $filterAFR
+  for i in {1..22}; do
+    zcat $imputedAFR/chr${i}.info.gz | awk 'NR>1 && (($5>0.01 && $7>0.3) || ($5<=0.01 && $7>0.5)) {print $1}' > tmp_imp_da${step}_AFR_chr${i}_snp_keep_list.txt
+    vcftools --gzvcf $imputedAFR/chr${i}.dose.vcf.gz --snps tmp_imp_da${step}_AFR_chr${i}_snp_keep_list.txt --recode --recode-INFO-all --stdout | bgzip > $filterAFR/chr${i}.AFR.dose.filtered.vcf.gz
+  done
+fi
+
+# The following code is from: https://github.com/ccrobertson/HumanCoreExome/blob/master/scripts/convert_to_plink.slurm
+# Convert to PLINK
+for i in {1..22}; do
+  plink2 --memory 15000 --vcf $filterAFR/chr${i}.AFR.dose.filtered.vcf.gz --double-id --make-bed --out tmp_imp_da${step}_AFR_chr${i}_1 &>> $logfile
+done
+
+# Update FID
+awk '{print $2,$2,$1,$2}' $releasepath/$releaseccAFR.fam > tmp_imp_da${step}_update_FID_AFR.txt
+
+for i in {1..22}; do
+  $PLINK --memory 15000 --bfile tmp_imp_da${step}_AFR_chr${i}_1 --update-ids tmp_imp_da${step}_update_FID_AFR.txt --make-bed --out tmp_imp_da${step}_AFR_chr${i}_2 &>> $logfile
+done
+
+# Extract complete families
+awk '{print $1,$2,$3,$4}' $releasepath/$releaseccAFR.fam > tmp_imp_da${step}_update_parents_AFR.txt
+
+for i in {1..22}; do
+  $PLINK --memory 15000 --bfile tmp_imp_da${step}_AFR_chr${i}_2 --keep tmp_imp_da${step}_update_parents_AFR.txt --make-bed --out tmp_imp_da${step}_AFR_chr${i}_2b &>> $logfile
+done
+
+# Update parents IDs
+for i in {1..22}; do
+  $PLINK --memory 15000 --bfile tmp_imp_da${step}_AFR_chr${i}_2b --update-parents tmp_imp_da${step}_update_parents_AFR.txt --make-bed --out tmp_imp_da${step}_AFR_chr${i}_3 &>> $logfile
+done
+
+# Update sex
+awk '{print $1,$2,$5}' $releasepath/$releaseccAFR.fam > tmp_imp_da${step}_update_sex_AFR.txt
+
+for i in {1..22}; do
+  $PLINK --memory 15000 --bfile tmp_imp_da${step}_AFR_chr${i}_3 --update-sex tmp_imp_da${step}_update_sex_AFR.txt --make-bed --out tmp_imp_da${step}_AFR_chr${i}_4 &>> $logfile
+done
+
+# Update T1D status
+awk '{print $1,$2,$6}' $releasepath/$releaseccAFR.fam > tmp_imp_da${step}_update_case_AFR.txt
+
+for i in {1..22}; do
+  $PLINK --memory 15000 --bfile tmp_imp_da${step}_AFR_chr${i}_4 --pheno tmp_imp_da${step}_update_case_AFR.txt --make-bed --out tmp_imp_da${step}_AFR_chr${i} &>> $logfile
+done
+
+# Copy the final updated .fam .bed .bim files after imputation and R2 > 0.3 filter
+if [ ! -d $updAFR ]; then
+  mkdir $updAFR
+  for i in {1..22}; do
+    cp $imp/tmp_imp_da${step}_AFR_chr${i}.fam $updAFR/AFR_chr${i}.fam
+    cp $imp/tmp_imp_da${step}_AFR_chr${i}.bed $updAFR/AFR_chr${i}.bed
+    cp $imp/tmp_imp_da${step}_AFR_chr${i}.bim $updAFR/AFR_chr${i}.bim
+  done
+fi
