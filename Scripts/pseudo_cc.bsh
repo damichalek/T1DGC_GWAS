@@ -1,0 +1,127 @@
+#!/bin/bash
+
+echo "Data analysis (plink + SAIGE) for pseudo-case control dataset from family T1DGC Humancore Exome data, Jun 30 2022, by Dominika Michalek"
+
+PLINK=plink1.9
+PLINK107=/mnt/t1/apps/statgen/plink-1.07-x86_64/plink
+KING=king
+logfile=pseudo_cc.log
+date > $logfile
+finalname=T1DGC_HCE
+
+# genotyped final release data
+geno=$HOME/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+
+echo -e
+step=1
+echo "Step $step: Prepare data for sparse matrix in PLINK (family data)"
+date
+
+$PLINK --bfile $geno/T1DGC_HCE_family-2021-01-20 --genome --out tmp_pcc${step}_fam &>> $logfile
+$PLINK --bfile $geno/T1DGC_HCE_family-2021-01-20 --genome --rel-check --out tmp_pcc${step}_fam_rel_check &>> $logfile
+
+
+echo -e
+step=2
+echo "Step $step: Prepare data for sparse matrix in KING (family data)"
+date
+
+$KING -b $geno/T1DGC_HCE_family-2021-01-20.bed --kinship --prefix tmp_pcc${step}_fam &>> $logfile
+$KING -b $geno/T1DGC_HCE_family-2021-01-20.bed --ibdseg --prefix tmp_pcc${step}_fam_ibd &>> $logfile
+
+
+echo -e
+step=3
+echo "Step $step: Check if there are any duplicate samples or MZ twins (family data)"
+date
+
+$KING -b $geno/T1DGC_HCE_family-2021-01-20.bed --duplicate --prefix tmp_pcc${step}_fam &>> $logfile
+
+
+echo -e
+step=4
+step3=$((step-1))
+echo "Step $step: Remove duplicate samples/MZ twins (family data)"
+date
+
+$PLINK -bfile $geno/T1DGC_HCE_family-2021-01-20 --remove tmp_pcc${step3}_fam.con --make-bed --out T1DGC_HCE_family-2021-01-20_no_MZ &>> $logfile
+
+
+echo -e
+step=5
+echo "Step $step: Remove unaffected sibs and affected parents from family dataset (no MZ twins)"
+date
+
+# make a list of unaffected sibs from T1DGC dataset (no MZ twins) - the one with the ending 05 or 06 in IID
+awk '$2 ~ /05$/ {print $0}' T1DGC_HCE_family-2021-01-20_no_MZ.fam > tmp_pcc${step}_unaffected_sibs.txt
+awk '$2 ~ /06$/ {print $0}' T1DGC_HCE_family-2021-01-20_no_MZ.fam >> tmp_pcc${step}_unaffected_sibs.txt
+
+# make a list of affected parents from T1DGC dataset (no MZ twins) - the one with the ending 01 or 02 in IID and phenotype 2 (last column)
+awk '$2 ~ /01$/ {print $0}' T1DGC_HCE_family-2021-01-20_no_MZ.fam > tmp_pcc${step}_parents.txt
+awk '$2 ~ /02$/ {print $0}' T1DGC_HCE_family-2021-01-20_no_MZ.fam >> tmp_pcc${step}_parents.txt
+
+awk '{if($6==2){print $0}}' tmp_pcc${step}_parents.txt > tmp_pcc${step}_affected_parents.txt
+
+
+# make a combined list of unaffected sibs and affected parents
+cat tmp_pcc${step}_unaffected_sibs.txt > tmp_pcc${step}_unaffected_sibs_affected_parents_tbr.txt
+cat tmp_pcc${step}_affected_parents.txt >> tmp_pcc${step}_unaffected_sibs_affected_parents_tbr.txt
+
+# remove samples
+$PLINK -bfile T1DGC_HCE_family-2021-01-20_no_MZ --remove tmp_pcc${step}_unaffected_sibs_affected_parents_tbr.txt --make-bed --out tmp_pcc${step}_fam_no_MZ_updated &>> $logfile
+
+
+echo -e
+step=6
+step5=$((step-1))
+echo "Step $step: Prepare pseudo-case control dataset from family dataset (no MZ twins, unaffected sibs, affected parents)"
+date
+
+
+# make .ped file of pseudo-case control dataset
+$PLINK107 --noweb --bfile tmp_pcc${step5}_fam_no_MZ_updated --tucc --out tmp_pcc${step}_cc &>> $logfile
+
+# make binary files of pseudo-case controls
+$PLINK --ped tmp_pcc${step}_cc.tucc.ped --map tmp_pcc${step5}_fam_no_MZ_updated.bim --make-bed --out tmp_pcc${step}_pseudo_cc &>> $logfile
+
+# remove remaining parent samples with 01_T/01_U and 02_T/02_U  
+awk '$2 ~ /01_/ || $2 ~ /02_/ {print $0}' tmp_pcc${step}_pseudo_cc.fam > tmp_pcc${step}_parents_tbr.txt
+
+$PLINK --bfile tmp_pcc${step}_pseudo_cc --remove tmp_pcc${step}_parents_tbr.txt --make-bed --out tmp_pcc${step}_pseudo_cc_no_parents &>> $logfile
+
+# exclude monomorphic SNPs
+$PLINK --bfile tmp_pcc${step}_pseudo_cc_no_parents --freq --out tmp_pcc${step}_pseudo_cc_freq &>> $logfile
+
+awk '{if($3==0 || $4==0){print $2}}' tmp_pcc${step}_pseudo_cc_freq.frq > tmp_pcc${step}_monomorphic_SNPs.txt
+
+$PLINK --bfile tmp_pcc${step}_pseudo_cc_no_parents --exclude tmp_pcc${step}_monomorphic_SNPs.txt --make-bed --out tmp_pcc${step}_pseudo_cc_final &>> $logfile
+
+# Copy final pseudo-case control files to Data release folder (Data_release-2021-01-20)
+cp tmp_pcc${step}_pseudo_cc_final.fam $geno/T1DGC_HCE_pseudo_cc-2021-01-20.fam
+cp tmp_pcc${step}_pseudo_cc_final.bim $geno/T1DGC_HCE_pseudo_cc-2021-01-20.bim
+cp tmp_pcc${step}_pseudo_cc_final.bed $geno/T1DGC_HCE_pseudo_cc-2021-01-20.bed
+
+# quick QC
+# to check if duplicates are only IIDs_T (transmitted)
+$KING -b T1DGC_HCE_family-2021-01-20_no_MZ.bed,tmp_pcc${step}_pseudo_cc_final.bed --duplicate --prefix tmp_pcc${step}_pseudo_cc_duplicates &>> $logfile
+$KING -b T1DGC_HCE_family-2021-01-20_no_MZ.bed,tmp_pcc${step}_pseudo_cc_final.bed --kinship --prefix tmp_pcc${step}_pseudo_cc_fam &>> $logfile
+$KING -b tmp_pcc${step}_pseudo_cc_final.bed --kinship --prefix tmp_pcc${step}_pseudo_cc_only &>> $logfile
+$KING -b tmp_pcc${step}_pseudo_cc_final.bed --related --prefix tmp_pcc${step}_pseudo_cc_only_rel &>> $logfile
+
+# Prepare EUR only pseudo-case control dataset
+awk 'NR>1' $geno/T1DGC_HCE_InferredAncestry_family.txt | awk '{print $1, $2"_T", $9}' | sed "s/ /\t/g" > tmp_pcc${step}_fam_anc.txt
+awk 'NR>1' $geno/T1DGC_HCE_InferredAncestry_family.txt | awk '{print $1, $2"_U", $9}' | sed "s/ /\t/g" >> tmp_pcc${step}_fam_anc.txt
+
+awk -v file=tmp_pcc${step}_fam_anc.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' $geno/T1DGC_HCE_pseudo_cc-2021-01-20.fam | sed "s/ /\t/g" > tmp_pcc${step}_anc.txt
+
+awk '{print $1, $2, $9}' tmp_pcc${step}_anc.txt | sed "s/ /\t/g" > tmp_pcc${step}_pcc_anc.txt
+
+# Take EUR from pseudo-case control
+awk '{if($3=="EUR"){print $1, $2}}' tmp_pcc${step}_pcc_anc.txt | sed "s/ /\t/g" > tmp_pcc${step}_pcc_EUR.txt
+
+$PLINK --bfile $geno/T1DGC_HCE_pseudo_cc-2021-01-20 --keep tmp_pcc${step}_pcc_EUR.txt --make-bed --out tmp_pcc${step}_pseudo_cc_EUR &>> $logfile
+
+# Copy final EUR pseudo-case control files to Data release folder (Data_release-2021-01-20)
+cp tmp_pcc${step}_pseudo_cc_EUR.fam $geno/T1DGC_HCE_pseudo_cc_EUR-2021-01-20.fam
+cp tmp_pcc${step}_pseudo_cc_EUR.bim $geno/T1DGC_HCE_pseudo_cc_EUR-2021-01-20.bim
+cp tmp_pcc${step}_pseudo_cc_EUR.bed $geno/T1DGC_HCE_pseudo_cc_EUR-2021-01-20.bed
