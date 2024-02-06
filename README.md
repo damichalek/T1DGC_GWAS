@@ -1,7 +1,6 @@
 # T1DGC: A multi-ancestry GWAS of type 1 diabetes
-Genome-wide association study of type 1 diabetes in AFR, AMR, EUR ancestry individuals. </br></br>
-
-For questions, please contact Dominika Michalek (dam8mt@virginia.edu)
+Genome-wide association study of type 1 diabetes in AFR, AMR, EUR ancestry individuals. </br>
+For questions, please contact Dominika Michalek (dam8mt@virginia.edu).
 
 ## Genotyped data
 All samples were genotyped using the Illumina Infinium CoreExome BeadChip in the Genome Sciences Laboratory at the University of Virginia. </br>
