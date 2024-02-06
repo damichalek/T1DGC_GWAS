@@ -40,7 +40,7 @@ pcAMR=${finalname}_pc_AMR
 anccc=${finalname}_InferredAncestry_cc
 ancfamily=${finalname}_InferredAncestry_family
 
-datapath=$HOME/data/T1DGC_Humancore_Exome/QC_Temp/QC_Final/Extra
+datapath=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/QC_Temp/QC_Final/Extra
 qcgeno=$datapath/t1dgc
 
 
