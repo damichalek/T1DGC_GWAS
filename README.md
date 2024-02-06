@@ -15,7 +15,10 @@ bash qc.bsh
 bash dst.bsh
 ```
 5. Generation of pseudo-case pseudo-control individuals from family dataset
-6. PCA
+```bash
+bash pseudo_cc.bsh
+```
+7. PCA
 
 ## Imputation
 1. Prepare data for imputation
