@@ -31,6 +31,11 @@ bash pre_imputation.bsh
 ```
 3. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) (1.5.7 and 1.6.6) and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!) (1.5.8)
 4. Download, unzip and filter imputation results
+```bash
+bash imp_filter.bsh
+bash imp_mi.bsh # filter imputed plink files with MI < 0.1
+bash imp_vcf.bsh # filter imputed VCF files with MI < 0.1
+```
 
 ## Association analyses
 1. Logistic mixed model regression in SAIGE for each ancestry group (AFR, AMR, EUR)
