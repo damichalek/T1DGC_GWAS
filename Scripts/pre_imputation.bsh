@@ -18,8 +18,8 @@ releaseccAFR=${finalname}_cc_AFR-2021-01-20
 releaseccAMR=${finalname}_cc_AMR-2021-01-20
 releasepcc=${finalname}_pseudo_cc-2021-01-20
 
-imputation=$HOME/data/T1DGC_Humancore_Exome/Data_analysis/Imputation
-preimputation=$HOME/data/T1DGC_Humancore_Exome/Data_analysis/Pre_Imputation
+imputation=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_analysis/Imputation
+preimputation=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_analysis/Pre_Imputation
 
 # The following code is based on code from https://github.com/ccrobertson/HumanCoreExome/blob/master/scripts/align_to_1000G.sh
 
