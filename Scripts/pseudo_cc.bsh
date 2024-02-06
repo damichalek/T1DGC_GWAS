@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Data analysis (plink + SAIGE) for pseudo-case control dataset from family T1DGC Humancore Exome data, Jun 30 2022, by Dominika Michalek"
+echo "Generate pseudo-case control dataset from family T1DGC Humancore Exome data, Jun 30 2022, by Dominika Michalek"
 
 PLINK=plink1.9
 PLINK107=/mnt/t1/apps/statgen/plink-1.07-x86_64/plink
