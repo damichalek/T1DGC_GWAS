@@ -19,8 +19,11 @@ bash dst.bsh
 
 ## Imputation
 1. Prepare data for imputation
-2. Impute data to TOPMed reference panel and HLA-TAPAS (chr6)
-3. Download, unzip and filter imputation results
+```bash
+bash pre-imputation.bsh
+```
+3. Impute data to TOPMed reference panel and HLA-TAPAS (chr6)
+4. Download, unzip and filter imputation results
 
 ## Association analyses
 1. Logistic mixed model regression in SAIGE for each ancestry group (AFR, AMR, EUR)
