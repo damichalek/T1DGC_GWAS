@@ -7,9 +7,15 @@ All samples were genotyped using the Illumina Infinium CoreExome BeadChip in the
 
 Genotyped data underwent following steps:
 1. QC
-2. Population structure and ancestry inference
-3. Generation of pseudo-case pseudo-control individuals from family dataset
-4. PCA
+```bash
+bash qc.bsh
+```
+3. Population structure and ancestry inference
+```bash
+bash dst.bsh
+```
+5. Generation of pseudo-case pseudo-control individuals from family dataset
+6. PCA
 
 ## Imputation
 1. Prepare data for imputation
