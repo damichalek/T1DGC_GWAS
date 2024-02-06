@@ -33,8 +33,12 @@ bash pre_imputation.bsh
 4. Download, unzip and filter imputation results
 ```bash
 bash imp_filter.bsh
-bash imp_mi.bsh # filter imputed plink files with MI < 0.1
-bash imp_vcf.bsh # filter imputed VCF files with MI < 0.1
+
+# filter imputed plink files with MI < 0.1
+bash imp_mi.bsh
+
+# filter imputed VCF files with MI < 0.1
+bash imp_vcf.bs
 ```
 
 ## Association analyses
