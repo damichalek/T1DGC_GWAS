@@ -1,0 +1,200 @@
+#!/bin/bash
+
+echo "Pre-imputation steps for T1DGC Humancore Exome data, Dec 10, 2020, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+PERL=perl
+logfile=da.log
+date > $logfile
+finalpath=../Data_analysis_Final
+finalpath2=$finalpath/Extra
+finalname=T1DGC_HCE
+phenopath=../Phenotype
+releasepath=../../Data_release-2021-01-20
+releasefamily=${finalname}_family-2021-01-20
+releasecc=${finalname}_cc-2021-01-20
+releaseccAFR=${finalname}_cc_AFR-2021-01-20
+releaseccAMR=${finalname}_cc_AMR-2021-01-20
+releasepcc=${finalname}_pseudo_cc-2021-01-20
+
+imputation=$HOME/data/T1DGC_Humancore_Exome/Data_analysis/Imputation
+preimputation=$HOME/data/T1DGC_Humancore_Exome/Data_analysis/Pre_Imputation
+
+# The following code is based on code from https://github.com/ccrobertson/HumanCoreExome/blob/master/scripts/align_to_1000G.sh
+
+echo -e
+step=12
+echo "Step $step: Define EUR unrelated controls for alignment and HWE"
+date
+
+# Get EUR
+
+awk '$9=="EUR" {print $0}' $finalpath2/T1DGC_HCE_InferredAncestry_family.txt | sed "s/ /\t/g" > tmp_da${step}_EUR_fam.txt
+awk 'NR>1 {print $1, $2}' tmp_da${step}_EUR_fam.txt > tmp_da${step}_EUR_keeplist.txt
+$PLINK --bfile $finalpath/$releasefamily --keep tmp_da${step}_EUR_keeplist.txt --make-bed --out tmp_da${step}_EUR_family &>> $logfile
+
+# Get controls
+
+awk '$6==1' tmp_da${step}_EUR_family.fam > tmp_da${step}_EUR_controls_keeplist.txt
+$PLINK --bfile $finalpath/$releasefamily --keep tmp_da${step}_EUR_controls_keeplist.txt --make-bed --out tmp_da${step}_EUR_controls &>> $logfile
+
+# Get unrelateds
+
+$KING -b tmp_da${step}_EUR_controls.bed --unrelated --degree 2 --prefix tmp_da${step}_EUR_controls_
+$PLINK --bfile tmp_da${step}_EUR_controls --keep tmp_da${step}_EUR_controls_unrelated.txt --make-bed --out tmp_da${step}_EUR_controls_unrelated_final &>> $logfile
+
+# Run HWE on unrelated european controls
+
+$PLINK --bfile tmp_da${step}_EUR_controls_unrelated_final --hardy --freq --out tmp_da${step}_EUR_controls_unrelated_freq &>> $logfile
+awk '$3=="UNAFF" && $9>0.000005 {print $2}' tmp_da${step}_EUR_controls_unrelated_freq.hwe > tmp_da${step}_snps_passing_hwe.txt
+
+
+
+echo -e
+step=13
+step12=$(($step-1))
+echo "Step $step: Align to the HRC reference panel"
+date
+
+# In order to perform next step following tools and sites need to be downloaded
+# wget http://www.well.ox.ac.uk/~wrayner/tools/HRC-1000G-check-bim-v4.2.7.zip
+# wget ftp://ngs.sanger.ac.uk/production/hrc/HRC.r1-1/HRC.r1-1.GRCh37.wgs.mac5.sites.tab.gz)
+
+$PERL $preimputation/HRC-1000G-check-bim-NoReadKey.pl -b tmp_da${step12}_EUR_family.bim -f tmp_da${step12}_EUR_controls_unrelated_freq.frq -r $preimputation/HRC.r1-1.GRCh37.wgs.mac5.sites.tab -h &>> $logfile
+
+
+
+echo -e
+step=14
+step12=$(($step-2))
+echo "Step $step: Run Rayner alignment program"
+date
+
+# Exclude SNPs (reasons: e.g. absent in the reference panel)
+
+$PLINK --bfile $finalpath/$releasefamily --exclude Exclude-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_family_TEMP1 &>> $logfile
+$PLINK --bfile $finalpath/$releaseccAFR --exclude Exclude-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_AFR_TEMP1 &>> $logfile
+$PLINK --bfile $finalpath/$releaseccAMR --exclude Exclude-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_AMR_TEMP1 &>> $logfile
+$PLINK --bfile $finalpath/$releasepcc --exclude Exclude-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_pseudo_cc_TEMP1 &>> $logfile
+
+# My chromosome and position files are empty
+
+# $PLINK --bfile TEMP1 --update-map ${data}/Chromosome-${alignment_nickname}-${refpanel}.txt --update-chr --make-bed --out TEMP2 &>> $logfile
+# $PLINK --bfile TEMP2 --update-map ${data}/Position-${alignment_nickname}-${refpanel}.txt --make-bed --out TEMP3 &>> $logfile
+
+# Flips strand
+
+$PLINK --bfile tmp_da${step}_family_TEMP1 --flip Strand-Flip-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_family_TEMP2 &>> $logfile
+$PLINK --bfile tmp_da${step}_AFR_TEMP1 --flip Strand-Flip-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_AFR_TEMP2 &>> $logfile
+$PLINK --bfile tmp_da${step}_AMR_TEMP1 --flip Strand-Flip-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_AMR_TEMP2 &>> $logfile
+$PLINK --bfile tmp_da${step}_pseudo_cc_TEMP1 --flip Strand-Flip-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out tmp_da${step}_pseudo_cc_TEMP2 &>> $logfile
+
+# Change alternative allele with the reference allele
+
+$PLINK --bfile tmp_da${step}_family_TEMP2 --reference-allele Force-Allele1-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out $imputation/${finalname}_family_upd &>> $logfile
+$PLINK --bfile tmp_da${step}_AFR_TEMP2 --reference-allele Force-Allele1-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out $imputation/${finalname}_AFR_upd &>> $logfile
+$PLINK --bfile tmp_da${step}_AMR_TEMP2 --reference-allele Force-Allele1-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out $imputation/${finalname}_AMR_upd &>> $logfile
+$PLINK --bfile tmp_da${step}_pseudo_cc_TEMP2 --reference-allele Force-Allele1-tmp_da${step12}_EUR_family-HRC.txt --make-bed --out $imputation/${finalname}_pseudo_cc_upd &>> $logfile
+
+
+echo -e
+step=15
+step12=$(($step-3))
+echo "Step $step: Filter updated data for HWE"
+date
+
+# Extract SNPs passing HWE
+
+$PLINK --bfile $imputation/${finalname}_family_upd --extract tmp_da${step12}_snps_passing_hwe.txt --make-bed --out $imputation/${finalname}_family_upd_filtered &>> $logfile
+$PLINK --bfile $imputation/${finalname}_AFR_upd --extract tmp_da${step12}_snps_passing_hwe.txt --make-bed --out $imputation/${finalname}_AFR_upd_filtered &>> $logfile
+$PLINK --bfile $imputation/${finalname}_AMR_upd --extract tmp_da${step12}_snps_passing_hwe.txt --make-bed --out $imputation/${finalname}_AMR_upd_filtered &>> $logfile
+$PLINK --bfile $imputation/${finalname}_pseudo_cc_upd --extract tmp_da${step12}_snps_passing_hwe.txt --make-bed --out $imputation/${finalname}_pseudo_cc_upd_filtered &>> $logfile
+
+
+echo -e
+step=16
+echo "Step $step: Convert PLINK format to VCF format"
+date
+
+$PLINK --bfile $imputation/${finalname}_family_upd_filtered --recode vcf-iid --out $imputation/${finalname}_family_updated_filtered &>> $logfile
+$PLINK --bfile $imputation/${finalname}_AFR_upd_filtered --recode vcf-iid --out $imputation/${finalname}_AFR_updated_filtered &>> $logfile
+$PLINK --bfile $imputation/${finalname}_AMR_upd_filtered --recode vcf-iid --out $imputation/${finalname}_AMR_updated_filtered &>> $logfile
+$PLINK --bfile $imputation/${finalname}_pseudo_cc_upd_filtered --recode vcf-iid --out $imputation/${finalname}_pseudo_cc_updated_filtered &>> $logfile
+
+# bgzip -> compresses  and decompresses files
+
+bgzip $imputation/${finalname}_family_updated_filtered.vcf
+bgzip $imputation/${finalname}_AFR_updated_filtered.vcf
+bgzip $imputation/${finalname}_AMR_updated_filtered.vcf
+bgzip $imputation/${finalname}_pseudo_cc_updated_filtered.vcf
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+
+tabix -p vcf $imputation/${finalname}_family_updated_filtered.vcf.gz
+tabix -p vcf $imputation/${finalname}_AFR_updated_filtered.vcf.gz
+tabix -p vcf $imputation/${finalname}_AMR_updated_filtered.vcf.gz
+tabix -p vcf $imputation/${finalname}_pseudo_cc_updated_filtered.vcf.gz
+
+# bcftools - in order to have .csi file
+
+bcftools index -c $imputation/${finalname}_family_updated_filtered.vcf.gz
+bcftools index -c $imputation/${finalname}_AFR_updated_filtered.vcf.gz
+bcftools index -c $imputation/${finalname}_AMR_updated_filtered.vcf.gz
+bcftools index -c $imputation/${finalname}_pseudo_cc_updated_filtered.vcf.gz
+
+
+echo -e
+step=17
+echo "Step $step: Break up by chromosome (for Michigan Imputation Server)"
+date
+
+# Separates each chromosome into different file
+
+for i in {1..22}; do
+  echo chr${i}
+  tabix -h $imputation/${finalname}_family_updated_filtered.vcf.gz ${i} | bgzip > $imputation/${finalname}_family_updated_filtered_chr${i}.vcf.gz
+done
+
+for i in {1..22}; do
+  echo chr${i}
+  tabix -h $imputation/${finalname}_AFR_updated_filtered.vcf.gz ${i} | bgzip > $imputation/${finalname}_AFR_updated_filtered_chr${i}.vcf.gz
+done
+
+for i in {1..22}; do
+  echo chr${i}
+  tabix -h $imputation/${finalname}_AMR_updated_filtered.vcf.gz ${i} | bgzip > $imputation/${finalname}_AMR_updated_filtered_chr${i}.vcf.gz
+done
+
+for i in {1..22}; do
+  echo chr${i}
+  tabix -h $imputation/${finalname}_pseudo_cc_updated_filtered.vcf.gz ${i} | bgzip > $imputation/${finalname}_pseudo_cc_updated_filtered_chr${i}.vcf.gz
+done
+
+
+
+echo -e
+step=18
+echo "Step $step: Tabix all the files (pseudo_cc)"
+date
+
+for i in {1..22}; do
+  tabix -p vcf $imputation/${finalname}_pseudo_cc_updated_filtered_chr${i}.vcf.gz
+done
+
+
+for i in {1..22}; do
+  bcftools index -c $imputation/${finalname}_pseudo_cc_updated_filtered_chr${i}.vcf.gz
+done
+
+
+# These are imputed filtered data (Filtered_Pseudo_cc)
+
+for i in {1..22}; do
+  tabix -p vcf chr${i}.pseudo_cc.dose.filtered.vcf.gz
+done
+
+for i in {1..22}; do
+  bcftools index -c chr${i}.pseudo_cc.dose.filtered.vcf.gz
+done
