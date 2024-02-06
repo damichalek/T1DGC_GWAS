@@ -18,7 +18,7 @@ bash dst.bsh
 ```bash
 bash pseudo_cc.bsh
 ```
-7. PCA
+7. Principal Component Analysis (PCA)
 ```bash
 bash pca.bsh
 ```
@@ -28,7 +28,7 @@ bash pca.bsh
 ```bash
 bash pre_imputation.bsh
 ```
-3. Impute data to TOPMed reference panel and HLA-TAPAS (chr6)
+3. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!)
 4. Download, unzip and filter imputation results
 
 ## Association analyses
