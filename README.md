@@ -6,11 +6,11 @@ For questions, please contact Dominika Michalek (dam8mt@virginia.edu).
 All samples were genotyped using the Illumina Infinium CoreExome BeadChip in the Genome Sciences Laboratory at the University of Virginia. </br>
 
 Genotyped data underwent following steps:
-1. QC
+1. SNP- and sample-level QC
 ```bash
 bash qc.bsh
 ```
-3. Population structure and ancestry inference
+3. Population structure and ancestry inference (+QC)
 ```bash
 bash dst.bsh
 ```
