@@ -1,0 +1,920 @@
+#!/bin/bash
+
+echo "Downstream analysis for T1DGC Humancore Exome data (ancestry inference, qc), Oct 12, 2020, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+logfile=dst.log
+date > $logfile
+nickname=T1DGC_Exome
+finalpath=../Downstream_Final
+finalpath2=$finalpath/Extra
+cleandata=t1dgcclean
+finalname=T1DGC_HCE
+phenopath=../Phenotype
+releasepath=../../Data_release-2020-12-03
+releasepath2=../../Data_release-2020-12-16
+releasepath3=../../Data_release-2021-01-20
+releasefamily=${finalname}_family-2020-12-03
+releasecc=${finalname}_cc-2020-12-03
+releaseccAFR=${finalname}_cc_AFR-2020-12-03
+releaseccAMR=${finalname}_cc_AMR-2020-12-03
+releasefamily2=${finalname}_family-2020-12-16
+releasecc2=${finalname}_cc-2020-12-16
+releaseccAFR2=${finalname}_cc_AFR-2020-12-16
+releaseccAMR2=${finalname}_cc_AMR-2020-12-16
+releasefamily3=${finalname}_family-2021-01-20
+releasecc3=${finalname}_cc-2021-01-20
+releaseccAFR3=${finalname}_cc_AFR-2021-01-20
+releaseccAMR3=${finalname}_cc_AMR-2021-01-20
+release3=${finalname}-2021-01-20
+sampledropfamily=$finalpath2/${finalname}_sampletoberemoved_family.txt
+sampledropcc=$finalpath2/${finalname}_sampletoberemoved_cc.txt
+sampledropccAFR=$finalpath2/${finalname}_sampletoberemoved_cc_AFR.txt
+sampledropccAMR=$finalpath2/${finalname}_sampletoberemoved_cc_AMR.txt
+snpdrop=$finalpath2/${finalname}_snptoberemoved.txt
+ancplotAFR=${finalname}_ancestryplot_AFR
+ancplotAMR=${finalname}_ancestryplot_AMR
+pcAFR=${finalname}_pc_AFR
+pcAMR=${finalname}_pc_AMR
+anccc=${finalname}_InferredAncestry_cc
+ancfamily=${finalname}_InferredAncestry_family
+
+datapath=$HOME/data/T1DGC_Humancore_Exome/QC_Temp/QC_Final/Extra
+qcgeno=$datapath/t1dgc
+
+
+echo "FID IID REASON" | sed "s/ /\t/g" > $sampledropfamily
+echo "FID IID REASON" | sed "s/ /\t/g" > $sampledropcc
+echo "FID IID REASON" | sed "s/ /\t/g" > $sampledropccAFR
+echo "FID IID REASON" | sed "s/ /\t/g" > $sampledropccAMR
+echo "SNP REASON" | sed "s/ /\t/g" > $snpdrop
+
+
+# Clean data are copied to the designated folder
+if [ ! -d $finalpath ]; then
+  mkdir $finalpath
+  cp $qcgeno.fam $finalpath/$cleandata.fam
+  cp $qcgeno.bim $finalpath/$cleandata.bim
+  cp $qcgeno.bed $finalpath/$cleandata.bed
+  cp $qcgeno.cov $finalpath/$cleandata.cov
+  mkdir $finalpath2
+fi
+
+
+# Summary of the clean data.
+echo -e
+step=0
+echo "Step $step: Summary of clean data"
+date
+nout=$(cat $qcgeno.fam | wc -l)
+nout2=$(cat $qcgeno.bim | wc -l)
+echo "There are $nout samples with $nout2 SNPs in the clean data $qcgeno"
+
+
+echo -e
+step=1
+nextstep=$(($step+1))
+echo "Step $step: Samples separation"
+date
+
+# Separate family samples from case-controls
+$KING -b $finalpath/$cleandata.bed --related --degree 2 --rplot --prefix tmp_dst${step}_related &>> $logfile
+
+awk 'NR>1' tmp_dst${step}_related.kin | awk '{print $1, $2}' | sort | uniq > tmp_dst${step}_family.txt
+awk 'NR>1' tmp_dst${step}_related.kin | awk '{print $1, $3}' | sort | uniq >> tmp_dst${step}_family.txt
+cat tmp_dst${step}_family.txt | sort | uniq > tmp_dst${step}_family_samples.txt
+
+# IDs with 11 at the end are moved to the control samples
+# IDs with 10 at the end are moved to the case samples
+grep "11$" tmp_dst${step}_family_samples.txt > tmp_dst${step}_to_swap.txt
+grep "10$" tmp_dst${step}_family_samples.txt >> tmp_dst${step}_to_swap.txt
+$PLINK --bfile $finalpath/$cleandata --keep tmp_dst${step}_family_samples.txt --make-bed --out tmp_dst$step &>> $logfile
+
+# Family samples
+# Samples with 11 a 10 at the end are removed
+$PLINK --bfile tmp_dst$step --remove tmp_dst${step}_to_swap.txt --make-bed --out tmp_dst${nextstep}_family &>> $logfile
+cat tmp_dst${nextstep}_family.fam | awk '{print $1, $2}' > tmp_dst${step}_upd_family.txt
+awk '{print $1, $2, "Case/Control"}' tmp_dst${step}_to_swap.txt | sed "s/ /\t/g" >> $sampledropfamily
+
+nout=$(cat tmp_dst${step}_upd_family.txt | wc -l)
+echo "There are $nout Family Samples" 
+
+# Case-control samples
+$PLINK --bfile $finalpath/$cleandata --remove tmp_dst${step}_upd_family.txt --make-bed --out tmp_dst${step}_cc &>> $logfile
+$KING -b tmp_dst${step}_cc.bed --unrelated --prefix tmp_dst${step}_cc_ &>> $logfile
+
+# tmp_dst1_cc_unrelated_toberemoved.txt -> These are related samples from family samples with the 11 or 10 at the end.
+$PLINK --bfile tmp_dst${step}_cc --remove tmp_dst${step}_cc_unrelated_toberemoved.txt --make-bed --out tmp_dst${nextstep}_cc &>> $logfile
+awk '{print $1, $2, "Related"}' tmp_dst${step}_cc_unrelated_toberemoved.txt | sed "s/ /\t/g" >> $sampledropcc
+cat tmp_dst${nextstep}_cc.fam | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_final.txt
+
+nout=$(cat tmp_dst${nextstep}_cc_final.txt | wc -l)
+echo "There are $nout Case-control Samples"
+
+
+echo -e
+step=2
+nextstep=$(($step+1))
+echo "Step $step: Population structure analysis"
+date
+
+# Separates the case-control samples based on acestry
+$KING -b $finalpath/../Downstream_data/KGref,tmp_dst${step}_cc --mds --proj --rplot --prefix tmp_dst${step}_cc_anc >> $logfile
+
+# Separates the family samples based on acestry
+$KING -b $finalpath/../Downstream_data/KGref,tmp_dst${step}_family --mds --proj --rplot --prefix tmp_dst${step}_family_anc >> $logfile
+
+
+echo -e
+step=3
+nextstep=$(($step+1))
+step2=$(($step-1))
+echo "Step $step: Ancestry separation of Case-control Samples"
+date
+
+# Make list of FIDs and IIDs with more than 1 population in case-control samples
+grep ";" tmp_dst${step2}_cc_anc_InferredAncestry.txt > tmp_dst${step}_multi_pop.txt
+cat tmp_dst${step}_multi_pop.txt | awk '{print $1, $2}' > tmp_dst${step}_cc_multi_pop.txt
+
+$PLINK --bfile tmp_dst${step2}_cc --remove tmp_dst${step}_cc_multi_pop.txt --make-bed --out tmp_dst${step}_cc_$finalname &>> $logfile
+cat tmp_dst${step}_cc_$finalname.fam | awk '{print $1, $2}' > tmp_dst${step}_cc_t1dgc.txt
+awk -v file=tmp_dst${step2}_cc_anc_InferredAncestry.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step}_cc_t1dgc.txt > tmp_dst${step}_cc_t1dgc_pop.txt
+cat tmp_dst${step}_cc_t1dgc_pop.txt | awk '{print $3, $4, $5, $6, $7, $8, $9, $10, $11}' > tmp_dst${step}_cc_t1dgc_pop_final.txt
+
+awk '$9 ~ /AFR/ {print $0}' tmp_dst${step}_cc_t1dgc_pop_final.txt | sed "s/ /\t/g" > $finalpath/AFR_cc.txt
+awk '$9 ~ /AMR/ {print $0}' tmp_dst${step}_cc_t1dgc_pop_final.txt | sed "s/ /\t/g" > $finalpath/AMR_cc.txt
+awk '$9 ~ /EUR/ {print $0}' tmp_dst${step}_cc_t1dgc_pop_final.txt | sed "s/ /\t/g" > $finalpath/EUR_cc.txt
+awk '$9 ~ /EAS/ {print $0}' tmp_dst${step}_cc_t1dgc_pop_final.txt | sed "s/ /\t/g" > $finalpath/EAS_cc.txt
+awk '$9 ~ /SAS/ {print $0}' tmp_dst${step}_cc_t1dgc_pop_final.txt | sed "s/ /\t/g" > $finalpath/SAS_cc.txt
+
+grep "EUR;AFR" tmp_dst${step}_multi_pop.txt >> $finalpath/AFR_cc.txt
+grep "AFR;EUR" tmp_dst${step}_multi_pop.txt >> $finalpath/AFR_cc.txt
+
+grep "EUR;AMR" tmp_dst${step}_multi_pop.txt >> $finalpath/AMR_cc.txt
+grep "AMR;EUR" tmp_dst${step}_multi_pop.txt >> $finalpath/AMR_cc.txt
+
+cat $finalpath/AFR_cc.txt | awk '{print $1, $2}' > tmp_dst${step}_AFR_cc_t1dgc.txt
+cat $finalpath/AMR_cc.txt | awk '{print $1, $2}' > tmp_dst${step}_AMR_cc_t1dgc.txt
+
+# Make binary file of AFR and AMR population from file of Case-control samples
+$PLINK --bfile tmp_dst${step2}_cc --keep tmp_dst${step}_AFR_cc_t1dgc.txt --make-bed --out $finalpath/AFR_$finalname &>> $logfile
+cat $finalpath/AFR_$finalname.fam | awk '$NF ~ /1/ {print $0}' > tmp_dst${step}_AFR_control.txt
+cat $finalpath/AFR_$finalname.fam | awk '$NF ~ /2/ {print $0}' > tmp_dst${step}_AFR_case.txt
+nout=$(cat tmp_dst${step}_AFR_case.txt | wc -l)
+echo "There are $nout Case Samples in AFR population"
+nout2=$(cat tmp_dst${step}_AFR_control.txt | wc -l)
+echo "There are $nout2 Control Samples in AFR population"
+
+$PLINK --bfile tmp_dst${step2}_cc --keep tmp_dst${step}_AMR_cc_t1dgc.txt --make-bed --out $finalpath/AMR_$finalname &>> $logfile
+cat $finalpath/AMR_$finalname.fam | awk '$NF ~ /1/ {print $0}' > tmp_dst${step}_AMR_control.txt
+cat $finalpath/AMR_$finalname.fam | awk '$NF ~ /2/ {print $0}' > tmp_dst${step}_AMR_case.txt
+nout=$(cat tmp_dst${step}_AMR_case.txt | wc -l)
+echo "There are $nout Case Samples in AMR population"
+nout2=$(cat tmp_dst${step}_AMR_control.txt | wc -l)
+echo "There are $nout2 Control Samples in AMR population"
+
+# These steps are performed to produce a multiple population list of samples to be removed for $sampledropcc
+# Binary file with multiple population is prepared
+# From binary file with multiple population, the AFR and AMR mixed populations are removed
+# Remaining samples are added to the $sampledropccAFR and $sampledropccAMR files (in order to be removed from the AFR and AFR samples - not from the whole case control file)
+# Released cc data consists of all multiple populations
+
+$PLINK --bfile tmp_dst${step2}_cc --keep tmp_dst${step}_cc_multi_pop.txt --make-bed --out tmp_dst${step}_cc_multi_pop_TEMP1 &>> $logfile
+
+grep "EUR;AFR" tmp_dst${step}_multi_pop.txt > tmp_dst${step}_AFR_multi_pop.txt
+grep "AFR;EUR" tmp_dst${step}_multi_pop.txt >> tmp_dst${step}_AFR_multi_pop.txt
+
+grep "EUR;AMR" tmp_dst${step}_multi_pop.txt > tmp_dst${step}_AMR_multi_pop.txt
+grep "AMR;EUR" tmp_dst${step}_multi_pop.txt >> tmp_dst${step}_AMR_multi_pop.txt
+
+cat tmp_dst${step}_AFR_multi_pop.txt | awk '{print $1, $2}' > tmp_dst${step}_AFR_AMR_multi_pop.txt
+cat tmp_dst${step}_AMR_multi_pop.txt | awk '{print $1, $2}' >> tmp_dst${step}_AFR_AMR_multi_pop.txt
+
+$PLINK --bfile tmp_dst${step}_cc_multi_pop_TEMP1 --remove tmp_dst${step}_AFR_AMR_multi_pop.txt --make-bed --out tmp_dst${step}_cc_multi_pop_TEMP2 &>> $logfile
+awk '{print $1, $2, "Multiple_populations"}' tmp_dst${step}_cc_multi_pop_TEMP2.fam | sed "s/ /\t/g" >> $sampledropccAFR
+awk '{print $1, $2, "Multiple_populations"}' tmp_dst${step}_cc_multi_pop_TEMP2.fam | sed "s/ /\t/g" >> $sampledropccAMR
+
+
+echo -e
+step=4
+nextstep=$(($step+1))
+step2=$(($step-2))
+step1=$(($step-3))
+echo "Step $step: Prepare files for checking the distribution of family and case-control samples"
+date
+
+# Merges phenotypic data for family affected samples (distribution)
+awk -F "\"*,\"*" '{print $5, $6, $9, $11, $10, $12}' $phenopath/T1DGC.2011.03_Resources_edited.csv > tmp_dst${step}_fam_a.txt
+
+awk -v file=tmp_dst${step}_fam_a.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step1}_upd_family.txt > tmp_dst${step}_fam.txt
+awk '{print $1, $2, $5, $6, $7, $8}' tmp_dst${step}_fam.txt > tmp_dst${step}_fam2.txt
+
+# $5 ~ /2/ -> Type 1 Diabetes
+awk '$5 ~ /2/ {print $0}' tmp_dst${step}_fam2.txt | sed "s/ /\t/g" > tmp_dst${step}_family.txt
+awk 'BEGIN {OFS = "\t"} {$7 = $4 - $6}1' tmp_dst${step}_family.txt > tmp_dst${step}_family2.txt > tmp_dst${step}_family_final.txt
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_family_samples.txt
+awk '{print $1, $2, $3, $4, $7, $5, $6}' tmp_dst${step}_family_final.txt | sed "s/ /\t/g" >> tmp_dst${step}_family_samples.txt
+
+awk -v file=$phenopath/e1a_core_GoKinD_060729.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step1}_upd_family.txt > tmp_dst${step}_fam_GoKinD.txt
+awk '{print $1, $2, $13, $14, $41, $37}' tmp_dst${step}_fam_GoKinD.txt > tmp_dst${step}_fam2_GoKinD.txt
+
+# $6 ~ /1/ -> Type 1 Diabetes
+awk '$6 ~ /1/ {print $0}' tmp_dst${step}_fam2_GoKinD.txt | sed "s/ /\t/g" > tmp_dst${step}_family_GoKinD.txt
+awk 'BEGIN {OFS = "\t"} {$7 = $4 - $5}1' tmp_dst${step}_family_GoKinD.txt > tmp_dst${step}_family2_GoKinD.txt >> tmp_dst${step}_family_samples.txt
+
+# Make list of family samples with DIABONSET <= 0
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_family_samples_to_be_removed.txt
+awk '$7 <=0 {print $0}' tmp_dst${step}_family_samples.txt | sed "s/ /\t/g" >> tmp_dst${step}_family_samples_to_be_removed.txt
+awk 'NR>1' tmp_dst${step}_family_samples_to_be_removed.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_family_samples_tbr.txt
+
+# Update list of family samples (remove the whole families based on DIABONSET <= 0)
+cat tmp_dst${nextstep}_family_samples_tbr.txt > tmp_dst${nextstep}_family_samples_tbr2.txt
+
+awk '$1 ~ /101058/ {print $1, $2}' tmp_dst${step}_fam2.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /204946/ {print $1, $2}' tmp_dst${step}_fam2.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /268638/ {print $1, $2}' tmp_dst${step}_fam2.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /283178/ {print $1, $2}' tmp_dst${step}_fam2.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /288467/ {print $1, $2}' tmp_dst${step}_fam2.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /442658/ {print $1, $2}' tmp_dst${step}_fam2.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /fam0689-/ {print $1, $2}' tmp_dst${step}_fam2_GoKinD.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+awk '$1 ~ /fam0853-/ {print $1, $2}' tmp_dst${step}_fam2_GoKinD.txt >> tmp_dst${nextstep}_family_samples_tbr2.txt
+
+cat tmp_dst${nextstep}_family_samples_tbr2.txt | sort | uniq > tmp_dst${nextstep}_family_samples_tbr_final.txt
+
+# Merge phenotypic data for case samples (distribution)
+awk -F "\"*,\"*" '{print $5, $6, $9, $11, $10, $12}' $phenopath/T1DGC.2011.03_Resources_edited.csv > tmp_dst${step}_c.txt
+
+awk -v file=tmp_dst${step}_c.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step2}_cc_final.txt > tmp_dst${step}_cc.txt
+awk '{print $1, $2, $5, $6, $7, $8}' tmp_dst${step}_cc.txt > tmp_dst${step}_cc2.txt
+awk '$5 ~ /2/ {print $0}' tmp_dst${step}_cc2.txt | sed "s/ /\t/g" > tmp_dst${step}_case.txt
+awk 'BEGIN {OFS = "\t"} {$7 = $4 - $6}1' tmp_dst${step}_case.txt > tmp_dst${step}_case2.txt > tmp_dst${step}_case_final.txt
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_case_samples.txt
+awk '{print $1, $2, $3, $4, $7, $5, $6}' tmp_dst${step}_case_final.txt | sed "s/ /\t/g" >> tmp_dst${step}_case_samples.txt
+
+awk -v file=$phenopath/e1a_core_GoKinD_060729.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step2}_cc_final.txt > tmp_dst${step}_cc_GoKinD.txt
+awk '{print $1, $2, $13, $14, $41, $37}' tmp_dst${step}_cc_GoKinD.txt > tmp_dst${step}_cc2_GoKinD.txt
+awk '$6 ~ /1/ {print $0}' tmp_dst${step}_cc2_GoKinD.txt | sed "s/ /\t/g" > tmp_dst${step}_case_GoKinD.txt
+awk 'BEGIN {OFS = "\t"} {$7 = $4 - $5}1' tmp_dst${step}_case_GoKinD.txt > tmp_dst${step}_case2_GoKinD.txt >> tmp_dst${step}_case_samples.txt
+
+# Make list of case samples with DIABONSET <= 0
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_case_samples_to_be_removed.txt
+awk '$7 <=0 {print $0}' tmp_dst${step}_case_samples.txt | sed "s/ /\t/g" >> tmp_dst${step}_case_samples_to_be_removed.txt
+awk 'NR>1' tmp_dst${step}_case_samples_to_be_removed.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_case_samples_tbr.txt
+
+# Merge phenotypic data for control samples (distribution)
+awk '$5 ~ /1/ {print $0}' tmp_dst${step}_cc2.txt | sed "s/ /\t/g" > tmp_dst${step}_control.txt
+awk '$5 ~ /0/ {print $0}' tmp_dst${step}_cc2.txt | sed "s/ /\t/g" >> tmp_dst${step}_control.txt
+echo "FIID IID SEX AGE T1DIA" | sed "s/ /\t/g" > tmp_dst${step}_control_samples.txt
+awk '{print $1, $2, $3, $4, $5}' tmp_dst${step}_control.txt | sed "s/ /\t/g" >> tmp_dst${step}_control_samples.txt
+
+awk '$6 ~ /0/ {print $0}' tmp_dst${step}_cc2_GoKinD.txt | sed "s/ /\t/g" > tmp_dst${step}_control_GoKinD.txt
+awk '$6 ~ /2/ {print $0}' tmp_dst${step}_cc2_GoKinD.txt | sed "s/ /\t/g" >> tmp_dst${step}_control_GoKinD.txt
+awk '{print $1, $2, $3, $4, $6}' tmp_dst${step}_control_GoKinD.txt | sed "s/ /\t/g" >> tmp_dst${step}_control_samples.txt
+
+
+echo -e
+step=5
+nextstep=$(($step+1))
+step2=$(($step-3))
+echo "Step $step: Update binary files of family and case-control samples for checking the distribution"
+date
+
+# Final file with Family samples without samples with DIABONSET <= 0 and corresponding families (for TDT)
+$PLINK --bfile tmp_dst${step2}_family --remove tmp_dst${step}_family_samples_tbr_final.txt --make-bed --out tmp_dst${step}_family_diabonset &>> $logfile
+awk '{print $1, $2, "DIABONSET<=0"}' tmp_dst${step}_family_samples_tbr_final.txt | sed "s/ /\t/g" >> $sampledropfamily
+cat tmp_dst${step}_family_diabonset.fam | awk '{print $1, $2}' > tmp_dst${step}_family_samples.txt
+
+nout=$(cat tmp_dst${step}_family_samples.txt | wc -l)
+echo "There are $nout Family Samples without samples with DIABONSET <= 0 and corresponding families" 
+
+# 3 samples to remove from Family samples (DIABONSET > 32 - one parent from each family is indicated as a person with T1D)
+# The list of samples with DIABONSET > 32 can be found in the next step, but I removed these samples at this point
+awk '$2 ~ /228242/ {print $1, $2}' tmp_dst${step}_family_samples.txt > tmp_dst${step}_f_tbr.txt
+awk '$2 ~ /263903/ {print $1, $2}' tmp_dst${step}_family_samples.txt >> tmp_dst${step}_f_tbr.txt
+awk '$2 ~ /404538/ {print $1, $2}' tmp_dst${step}_family_samples.txt >> tmp_dst${step}_f_tbr.txt
+
+# Final file with Family samples
+$PLINK --bfile tmp_dst${step}_family_diabonset --remove tmp_dst${step}_f_tbr.txt --make-bed --out tmp_dst${step}_family &>> $logfile
+awk '{print $1, $2, "DIABONSET>32_T1D_parent"}' tmp_dst${step}_f_tbr.txt | sed "s/ /\t/g" >> $sampledropfamily
+cat tmp_dst${step}_family.fam | awk '{print $1, $2}' > tmp_dst${step}_family_samples_final.txt
+
+nout=$(cat tmp_dst${step}_family_samples_final.txt | wc -l)
+echo "There are $nout Family Samples without T1D parents with DIABONSET > 32" 
+
+# File with Case-control samples without samples with DIABONSET <= 0
+$PLINK --bfile tmp_dst${step2}_cc --remove tmp_dst${step}_case_samples_tbr.txt --make-bed --out tmp_dst${step}_cc_diabonset &>> $logfile
+awk '{print $1, $2, "DIABONSET<=0"}' tmp_dst${step}_case_samples_tbr.txt | sed "s/ /\t/g" >> $sampledropcc
+
+cat tmp_dst${step}_cc_diabonset.fam | awk '{print $1, $2}' > tmp_dst${step}_cc_samples.txt
+
+nout=$(cat tmp_dst${step}_cc_samples.txt | wc -l)
+echo "There are $nout Case-control Samples without samples with DIABONSET <= 0"
+
+# 7 samples to remove from Case-control samples (missing final SI report)
+awk '$2 ~ /15292403/ {print $1, $2}' tmp_dst${step}_cc_samples.txt > tmp_dst${step}_cc_tbr.txt
+awk '$2 ~ /27800204/ {print $1, $2}' tmp_dst${step}_cc_samples.txt >> tmp_dst${step}_cc_tbr.txt
+awk '$2 ~ /42191704/ {print $1, $2}' tmp_dst${step}_cc_samples.txt >> tmp_dst${step}_cc_tbr.txt
+awk '$2 ~ /48178603/ {print $1, $2}' tmp_dst${step}_cc_samples.txt >> tmp_dst${step}_cc_tbr.txt
+awk '$2 ~ /48689403/ {print $1, $2}' tmp_dst${step}_cc_samples.txt >> tmp_dst${step}_cc_tbr.txt
+awk '$2 ~ /48965203/ {print $1, $2}' tmp_dst${step}_cc_samples.txt >> tmp_dst${step}_cc_tbr.txt
+awk '$2 ~ /53189604/ {print $1, $2}' tmp_dst${step}_cc_samples.txt >> tmp_dst${step}_cc_tbr.txt
+
+# Final file with Case-control samples
+$PLINK --bfile tmp_dst${step}_cc_diabonset --remove tmp_dst${step}_cc_tbr.txt --make-bed --out tmp_dst${step}_cc &>> $logfile
+awk '{print $1, $2, "Missing_final_SI_report"}' tmp_dst${step}_cc_tbr.txt | sed "s/ /\t/g" >> $sampledropcc
+
+cat tmp_dst${step}_cc.fam | awk '{print $1, $2}' > tmp_dst${step}_cc_samples_final.txt
+
+nout=$(cat tmp_dst${step}_cc_samples_final.txt | wc -l)
+echo "There are $nout Case-control Samples without samples with missing final SI report"
+
+
+echo -e
+step=6
+nextstep=$(($step+1))
+step4=$(($step-2))
+step5=$(($step-1))
+echo "Step $step: Update files for checking the distribution of family and case-control samples"
+date
+
+# Phenotypic data for family samples (distribution)
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_family_samples.txt
+awk -v file=tmp_dst${step5}_family_samples.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step4}_family_samples.txt > tmp_dst${step}_family.txt
+awk '{print $1, $2, $3, $4, $5, $6, $7}' tmp_dst${step}_family.txt | sed "s/ /\t/g" >> tmp_dst${step}_family_samples.txt
+
+# Phenotypic data for family samples (distribution) without the parents
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_family_parents.txt
+awk '$2 ~ /01$/ {print $0}' tmp_dst${step}_family_samples.txt | sed "s/ /\t/g" >> tmp_dst${step}_family_parents.txt
+awk '$2 ~ /02$/ {print $0}' tmp_dst${step}_family_samples.txt | sed "s/ /\t/g" >> tmp_dst${step}_family_parents.txt
+cat tmp_dst${step}_family_parents.txt | awk '{print $1, $2}' > tmp_dst${step}_family_parents_tbr.txt
+
+$PLINK --bfile tmp_dst${step5}_family --remove tmp_dst${step}_family_parents_tbr.txt --make-bed --out tmp_dst${step}_family &>> $logfile
+cat tmp_dst${step}_family.fam | awk '{print $1, $2}' > tmp_dst${step}_family_wo_parents.txt
+
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_family_without_parents.txt
+awk -v file=tmp_dst${step}_family_samples.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step}_family_wo_parents.txt > tmp_dst${step}_family_wo_parents2.txt
+awk '{print $3, $4, $5, $6, $7, $8, $9}' tmp_dst${step}_family_wo_parents2.txt | sed "s/ /\t/g" >> tmp_dst${step}_family_without_parents.txt
+
+# Make list of family samples with DIABONSET > 32
+awk '$7 >32 {print $0}' tmp_dst${step}_family_without_parents.txt | sed "s/ /\t/g" > tmp_dst${step}_family_samples_to_check.txt
+
+# Phenotypic data for case samples (distribution)
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_case_samples.txt
+awk -v file=tmp_dst${step5}_cc_samples.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step4}_case_samples.txt > tmp_dst${step}_case.txt
+awk '{print $1, $2, $3, $4, $5, $6, $7}' tmp_dst${step}_case.txt | sed "s/ /\t/g" >> tmp_dst${step}_case_samples.txt
+
+# Make list of case samples with DIABONSET > 32
+awk '$7 >32 {print $0}' tmp_dst${step}_case_samples.txt | sed "s/ /\t/g" > tmp_dst${step}_case_samples_to_check.txt
+
+# Phenotypic data for control samples (distribution)
+cat tmp_dst${step4}_control_samples.txt > tmp_dst${step}_control_samples.txt
+
+# Phenotypic data for case-control samples
+echo "FIID IID SEX AGE T1DIA" | sed "s/ /\t/g" > tmp_dst${step}_cc.txt
+awk 'NR>1' tmp_dst${step}_case_samples.txt | awk '{print $1, $2, $3, $4, "case"}' | sed "s/ /\t/g" >> tmp_dst${step}_cc.txt
+awk 'NR>1' tmp_dst${step}_control_samples.txt | awk '{print $1, $2, $3, $4, "control"}' | sed "s/ /\t/g" >> tmp_dst${step}_cc.txt
+
+# Phenotypic data for family-case samples
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET" | sed "s/ /\t/g" > tmp_dst${step}_family_cc.txt
+awk 'NR>1' tmp_dst${step}_family_without_parents.txt | awk '{print $1, $2, $3, $4, $5, "family", $7}' | sed "s/ /\t/g" >> tmp_dst${step}_family_cc.txt
+awk 'NR>1' tmp_dst${step}_case_samples.txt | awk '{print $1, $2, $3, $4, $5, "case", $7}' | sed "s/ /\t/g" >> tmp_dst${step}_family_cc.txt
+
+
+echo -e
+step=7
+nextstep=$(($step+1))
+step6=$(($step-1))
+echo "Step $step: Separate case-control samples into distinct populations for checking the distribution"
+date
+
+# Phenotypic data for case samples (AFR)
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_case_AFR.txt
+awk -v file=$finalpath/AFR_cc.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step6}_case_samples.txt > tmp_dst${step}_ca_AFR.txt
+awk '{print $1, $2, $3, $4, $5, $6, $7, $12}' tmp_dst${step}_ca_AFR.txt | sed "s/ /\t/g" >> tmp_dst${step}_case_AFR.txt
+
+awk 'NR>1' tmp_dst${step}_case_AFR.txt | awk '{print $1, $2}' > tmp_dst${step}_case_AFR_to_keep.txt
+
+# Final file with case samples (AFR)
+$PLINK --bfile tmp_dst${step5}_cc --keep tmp_dst${step}_case_AFR_to_keep.txt --make-bed --out tmp_dst${step}_AFR_case &>> $logfile
+cat tmp_dst${step}_AFR_case.fam | awk '{print $1, $2}' > tmp_dst${step}_AFR_case_samples.txt
+
+nout=$(cat tmp_dst${step}_AFR_case_samples.txt | wc -l)
+echo "There are $nout Case Samples in AFR population"
+
+# Phenotypic data for control samples (AFR)
+echo "FIID IID SEX AGE T1DIA ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_control_AFR.txt
+awk -v file=$finalpath/AFR_cc.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step6}_control_samples.txt > tmp_dst${step}_co_AFR.txt
+awk '{print $1, $2, $3, $4, $5, $10}' tmp_dst${step}_co_AFR.txt | sed "s/ /\t/g" >> tmp_dst${step}_control_AFR.txt
+
+awk 'NR>1' tmp_dst${step}_control_AFR.txt | awk '{print $1, $2}' > tmp_dst${step}_control_AFR_to_keep.txt
+
+# Final file with control samples (AFR)
+$PLINK --bfile tmp_dst${step5}_cc --keep tmp_dst${step}_control_AFR_to_keep.txt --make-bed --out tmp_dst${step}_AFR_control &>> $logfile
+cat tmp_dst${step}_AFR_control.fam | awk '{print $1, $2}' > tmp_dst${step}_AFR_control_samples.txt
+
+nout=$(cat tmp_dst${step}_AFR_control_samples.txt | wc -l)
+echo "There are $nout Control Samples in AFR population"
+
+# Phenotypic data for case-control samples (AFR)
+echo "FIID IID SEX AGE T1DIA ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_cc_AFR.txt
+awk 'NR>1' tmp_dst${step}_case_AFR.txt | awk '{print $1, $2, $3, $4, "case", $8}' | sed "s/ /\t/g" >> tmp_dst${step}_cc_AFR.txt
+awk 'NR>1' tmp_dst${step}_control_AFR.txt | awk '{print $1, $2, $3, $4, "control", $6}' | sed "s/ /\t/g" >> tmp_dst${step}_cc_AFR.txt
+
+awk 'NR>1' tmp_dst${step}_cc_AFR.txt | awk '{print $1, $2}' > tmp_dst${step}_cc_AFR_to_keep.txt
+
+# Final file with case-control samples (AFR)
+$PLINK --bfile tmp_dst${step5}_cc --keep tmp_dst${step}_cc_AFR_to_keep.txt --make-bed --out tmp_dst${step}_AFR_cc &>> $logfile
+cat tmp_dst${step}_AFR_cc.fam | awk '{print $1, $2}' > tmp_dst${step}_AFR_cc_samples.txt
+
+nout=$(cat tmp_dst${step}_AFR_cc_samples.txt | wc -l)
+echo "There are $nout Samples in AFR population"
+
+# Phenotypic data for case samples (AMR)
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_case_AMR.txt
+awk -v file=$finalpath/AMR_cc.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step6}_case_samples.txt > tmp_dst${step}_ca_AMR.txt
+awk '{print $1, $2, $3, $4, $5, $6, $7, $12}' tmp_dst${step}_ca_AMR.txt | sed "s/ /\t/g" >> tmp_dst${step}_case_AMR.txt
+
+awk 'NR>1' tmp_dst${step}_case_AMR.txt | awk '{print $1, $2}' > tmp_dst${step}_case_AMR_to_keep.txt
+
+# Final file with case samples (AMR)
+$PLINK --bfile tmp_dst${step5}_cc --keep tmp_dst${step}_case_AMR_to_keep.txt --make-bed --out tmp_dst${step}_AMR_case &>> $logfile
+cat tmp_dst${step}_AMR_case.fam | awk '{print $1, $2}' > tmp_dst${step}_AMR_case_samples.txt
+
+nout=$(cat tmp_dst${step}_AMR_case_samples.txt | wc -l)
+echo "There are $nout Case Samples in AMR population"
+
+# Phenotypic data for control samples (AMR)
+echo "FIID IID SEX AGE T1DIA ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_control_AMR.txt
+awk -v file=$finalpath/AMR_cc.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step6}_control_samples.txt > tmp_dst${step}_co_AMR.txt
+awk '{print $1, $2, $3, $4, $5, $10}' tmp_dst${step}_co_AMR.txt | sed "s/ /\t/g" >> tmp_dst${step}_control_AMR.txt
+
+awk 'NR>1' tmp_dst${step}_control_AMR.txt | awk '{print $1, $2}' > tmp_dst${step}_control_AMR_to_keep.txt
+
+# Final file with control samples (AMR)
+$PLINK --bfile tmp_dst${step5}_cc --keep tmp_dst${step}_control_AMR_to_keep.txt --make-bed --out tmp_dst${step}_AMR_control &>> $logfile
+cat tmp_dst${step}_AMR_control.fam | awk '{print $1, $2}' > tmp_dst${step}_AMR_control_samples.txt
+
+nout=$(cat tmp_dst${step}_AMR_control_samples.txt | wc -l)
+echo "There are $nout Control Samples in AMR population"
+
+# Phenotypic data for case-control samples (AMR)
+echo "FIID IID SEX AGE T1DIA ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_cc_AMR.txt
+awk 'NR>1' tmp_dst${step}_case_AMR.txt | awk '{print $1, $2, $3, $4, "case", $8}' | sed "s/ /\t/g" >> tmp_dst${step}_cc_AMR.txt
+awk 'NR>1' tmp_dst${step}_control_AMR.txt | awk '{print $1, $2, $3, $4, "control", $6}' | sed "s/ /\t/g" >> tmp_dst${step}_cc_AMR.txt
+
+awk 'NR>1' tmp_dst${step}_cc_AMR.txt | awk '{print $1, $2}' > tmp_dst${step}_cc_AMR_to_keep.txt
+
+# Final file with case-control samples (AFR)
+$PLINK --bfile tmp_dst${step5}_cc --keep tmp_dst${step}_cc_AMR_to_keep.txt --make-bed --out tmp_dst${step}_AMR_cc &>> $logfile
+cat tmp_dst${step}_AMR_cc.fam | awk '{print $1, $2}' > tmp_dst${step}_AMR_cc_samples.txt
+
+nout=$(cat tmp_dst${step}_AMR_cc_samples.txt | wc -l)
+echo "There are $nout Samples in AMR population"
+
+# Phenotypic data for case samples (AFR vs AMR)
+echo "FIID IID SEX AGE DIABDUR T1DIA DIABONSET ANCESTRY" | sed "s/ /\t/g" > tmp_dst${step}_case_AFR_AMR.txt
+awk 'NR>1' tmp_dst${step}_case_AFR.txt | awk '{print $1, $2, $3, $4, $5, "case_AFR", $7, $8}' | sed "s/ /\t/g" >> tmp_dst${step}_case_AFR_AMR.txt
+awk 'NR>1' tmp_dst${step}_case_AMR.txt | awk '{print $1, $2, $3, $4, $5, "case_AMR", $7, $8}' | sed "s/ /\t/g" >> tmp_dst${step}_case_AFR_AMR.txt
+
+
+echo -e
+step=8
+step5=$(($step-3))
+echo "Step $step: Transmission/Disequilibrium Test (TDT)"
+date
+
+# Perform TDT test (family samples)
+$PLINK --bfile tmp_dst${step5}_family --tdt --out tmp_dst${step}_family &>> $logfile
+
+
+echo -e
+step=9
+step2=$(($step-7))
+step5=$(($step-4))
+step6=$(($step-3))
+echo "Step $step: Logistic regression"
+date
+
+# Perform logistic regression with Covariate file (case-control samples)
+awk -v file=tmp_dst${step2}_cc_anc_InferredAncestry.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' tmp_dst${step6}_cc.txt > tmp_dst${step}_cc_covariate.txt
+awk '{print $1, $2, $4, $8, $9}' tmp_dst${step}_cc_covariate.txt > tmp_dst${step}_cc_cov.txt
+
+$PLINK --bfile tmp_dst${step5}_cc --logistic --ci 0.95 --covar tmp_dst${step}_cc_cov.txt --hide-covar --out tmp_dst${step}_cc &>> $logfile
+$PLINK --bfile tmp_dst${step5}_cc --logistic --ci 0.95 --covar tmp_dst${step}_cc_cov.txt --hide-covar --maf 0.05 --out tmp_dst${step}_cc_maf &>> $logfile
+
+# Exclude the MHC region (position based on GRCh37) - 3 588 SNPs
+# https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
+$PLINK --bfile tmp_dst${step5}_cc --chr 6 --from-bp 28477797 --to-bp 33448354 --make-bed --out tmp_dst${step}_cc_MHC &>> $logfile
+awk '{print $2}' tmp_dst${step}_cc_MHC.bim > tmp_dst${step}_cc_MHC_SNPs_tbr.txt
+$PLINK --bfile tmp_dst${step5}_cc --exclude tmp_dst${step}_cc_MHC_SNPs_tbr.txt --make-bed --out tmp_dst${step}_cc_without_MHC &>> $logfile
+
+# Perform logistic regression with Covariate file (case-control samples) without the MHC region SNPs
+$PLINK --bfile tmp_dst${step}_cc_without_MHC --logistic --ci 0.95 --covar tmp_dst${step}_cc_cov.txt --hide-covar --out tmp_dst${step}_cc_wo_MHC &>> $logfile
+$PLINK --bfile tmp_dst${step}_cc_without_MHC --logistic --ci 0.95 --covar tmp_dst${step}_cc_cov.txt --hide-covar --maf 0.05 --out tmp_dst${step}_cc_maf_wo_MHC &>> $logfile
+
+
+echo -e
+step=10
+nextstep=$(($step+1))
+step9=$(($step-1))
+step7=$(($step-3))
+echo "Step $step: Remove MHC region"
+date
+
+# Exclude the MHC region (position based on GRCh37) - 3 588 SNPs
+# https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
+
+# AFR case-control samples
+$PLINK --bfile tmp_dst${step7}_AFR_cc --exclude tmp_dst${step9}_cc_MHC_SNPs_tbr.txt --maf 0.05 --make-bed --out tmp_dst${step}_AFR_cc &>> $logfile
+
+# AMR case-control samples
+$PLINK --bfile tmp_dst${step7}_AMR_cc --exclude tmp_dst${step9}_cc_MHC_SNPs_tbr.txt --maf 0.05 --make-bed --out tmp_dst${step}_AMR_cc &>> $logfile
+
+
+# test
+# AFR
+$PLINK --bfile tmp_dst${step7}_AFR_cc  --chr 6 --from-bp 28477797 --to-bp 33448354 --make-bed --out tmp_dst${step}_AFR_MHC &>> $logfile
+awk '{print $2}' tmp_dst${step}_AFR_MHC.bim > tmp_dst${step}_AFR_MHC_SNPs_tbr2.txt
+
+$PLINK --bfile tmp_dst${step7}_AFR_cc --exclude tmp_dst${step}_AFR_MHC_SNPs_tbr2.txt --maf 0.05 --make-bed --out tmp_dst${step}_AFR_cc2 &>> $logfile
+
+# AMR
+$PLINK --bfile tmp_dst${step7}_AMR_cc  --chr 6 --from-bp 28477797 --to-bp 33448354 --make-bed --out tmp_dst${step}_AMR_MHC &>> $logfile
+awk '{print $2}' tmp_dst${step}_AMR_MHC.bim > tmp_dst${step}_AMR_MHC_SNPs_tbr2.txt
+
+$PLINK --bfile tmp_dst${step7}_AMR_cc --exclude tmp_dst${step}_AMR_MHC_SNPs_tbr2.txt --maf 0.05 --make-bed --out tmp_dst${step}_AMR_cc2 &>> $logfile
+
+
+echo -e
+step=11
+nextstep=$(($step+1))
+step10=$(($step-1))
+echo "Step $step: LD-pruning"
+date
+
+# Perform LD-pruning on AFR and AMR population samples
+# The command above that specifies 50 5 0.5 would 
+# a) consider a window of 50 SNPs, 
+# b) calculate LD between each pair of SNPs in the window, 
+# b) remove one of a pair of SNPs if the LD is greater than 0.5, 
+# c) shift the window 5 SNPs forward and repeat the procedure
+
+$PLINK --bfile tmp_dst${step10}_AFR_cc --indep-pairwise 50 5 0.5 --out tmp_dst${step}_AFR_cc &>> $logfile
+$PLINK --bfile tmp_dst${step10}_AFR_cc --exclude tmp_dst${step}_AFR_cc.prune.out --make-bed --out tmp_dst${nextstep}_AFR_cc &>> $logfile
+
+$PLINK --bfile tmp_dst${step10}_AMR_cc --indep-pairwise 50 5 0.5 --out tmp_dst${step}_AMR_cc &>> $logfile
+$PLINK --bfile tmp_dst${step10}_AMR_cc --exclude tmp_dst${step}_AMR_cc.prune.out --make-bed --out tmp_dst${nextstep}_AMR_cc &>> $logfile
+
+# TEST
+$PLINK --bfile tmp_dst${step10}_AFR_cc2 --indep-pairwise 50 5 0.5 --out tmp_dst${step}_AFR_cc2 &>> $logfile
+$PLINK --bfile tmp_dst${step10}_AFR_cc2 --exclude tmp_dst${step}_AFR_cc2.prune.out --make-bed --out tmp_dst${nextstep}_AFR_cc2 &>> $logfile
+
+$PLINK --bfile tmp_dst${step10}_AMR_cc2 --indep-pairwise 50 5 0.5 --out tmp_dst${step}_AMR_cc2 &>> $logfile
+$PLINK --bfile tmp_dst${step10}_AMR_cc2 --exclude tmp_dst${step}_AMR_cc2.prune.out --make-bed --out tmp_dst${nextstep}_AMR_cc2 &>> $logfile
+
+
+echo -e
+step=12
+nextstep=$(($step+1))
+step11=$(($step-1))
+echo "Step $step: Prepare AFR and AMR data for PCA and MDS projection"
+date
+
+cat tmp_dst${step}_AFR_cc.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AFR_control.txt
+cat tmp_dst${step}_AFR_cc.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AFR_case.txt
+
+$PLINK --bfile tmp_dst${step}_AFR_cc --keep tmp_dst${step}_AFR_control.txt --make-bed --out tmp_dst${nextstep}_AFR_control &>> $logfile
+$PLINK --bfile tmp_dst${step}_AFR_cc --keep tmp_dst${step}_AFR_case.txt --make-bed --out tmp_dst${nextstep}_AFR_case &>> $logfile
+
+cat tmp_dst${step}_AMR_cc.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AMR_control.txt
+cat tmp_dst${step}_AMR_cc.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AMR_case.txt
+
+$PLINK --bfile tmp_dst${step}_AMR_cc --keep tmp_dst${step}_AMR_control.txt --make-bed --out tmp_dst${nextstep}_AMR_control &>> $logfile
+$PLINK --bfile tmp_dst${step}_AMR_cc --keep tmp_dst${step}_AMR_case.txt --make-bed --out tmp_dst${nextstep}_AMR_case &>> $logfile
+
+# test
+cat tmp_dst${step}_AFR_cc2.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AFR_control2.txt
+cat tmp_dst${step}_AFR_cc2.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AFR_case2.txt
+
+$PLINK --bfile tmp_dst${step}_AFR_cc2 --keep tmp_dst${step}_AFR_control2.txt --make-bed --out tmp_dst${nextstep}_AFR_control2 &>> $logfile
+$PLINK --bfile tmp_dst${step}_AFR_cc2 --keep tmp_dst${step}_AFR_case2.txt --make-bed --out tmp_dst${nextstep}_AFR_case2 &>> $logfile
+
+cat tmp_dst${step}_AMR_cc2.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AMR_control2.txt
+cat tmp_dst${step}_AMR_cc2.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AMR_case2.txt
+
+$PLINK --bfile tmp_dst${step}_AMR_cc2 --keep tmp_dst${step}_AMR_control2.txt --make-bed --out tmp_dst${nextstep}_AMR_control2 &>> $logfile
+$PLINK --bfile tmp_dst${step}_AMR_cc2 --keep tmp_dst${step}_AMR_case2.txt --make-bed --out tmp_dst${nextstep}_AMR_case2 &>> $logfile
+
+
+echo -e
+step=13
+nextstep=$(($step+1))
+echo "Step $step: PCA and MDS projection of AFR and AMR data"
+date
+
+# Project case samples from AFR population on control samples
+$KING -b tmp_dst${step}_AFR_control.bed,tmp_dst${step}_AFR_case.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AFR &>> $logfile
+$KING -b tmp_dst${step}_AFR_control.bed,tmp_dst${step}_AFR_case.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AFR_mds &>> $logfile
+
+# Make list of samples from AFR population to be removed based on the PC2 > 0.3
+awk '$8 >0.3 {print $0}' tmp_dst${step}_cc_AFRpc.txt | sed "s/ /\t/g" > tmp_dst${step}_cc_AFR_wo_outlier.txt
+awk 'NR>1' tmp_dst${step}_cc_AFR_wo_outlier.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_AFR_tbr.txt
+
+awk '$8 >0.3 {print $0}' tmp_dst${step}_cc_AFR_mdspc.txt | sed "s/ /\t/g" > tmp_dst${step}_cc_AFR_mds_wo_outlier.txt
+awk 'NR>1' tmp_dst${step}_cc_AFR_mds_wo_outlier.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_AFR_mds_tbr.txt
+
+# Project case samples from AMR population on control samples
+$KING -b tmp_dst${step}_AMR_control.bed,tmp_dst${step}_AMR_case.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AMR &>> $logfile
+$KING -b tmp_dst${step}_AMR_control.bed,tmp_dst${step}_AMR_case.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AMR_mds &>> $logfile
+
+# Make list of samples from AMR population to be removed based on the PC2 > 0.3
+awk '$8 >0.3 {print $0}' tmp_dst${step}_cc_AMRpc.txt | sed "s/ /\t/g" > tmp_dst${step}_cc_AMR_wo_outlier.txt
+awk 'NR>1' tmp_dst${step}_cc_AMR_wo_outlier.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_AMR_tbr.txt
+
+awk '$8 >0.3 {print $0}' tmp_dst${step}_cc_AMR_mdspc.txt | sed "s/ /\t/g" > tmp_dst${step}_cc_AMR_mds_wo_outlier.txt
+awk 'NR>1' tmp_dst${step}_cc_AMR_mds_wo_outlier.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_AMR_mds_tbr.txt
+
+# test
+# Project case samples from AFR population on control samples
+$KING -b tmp_dst${step}_AFR_control2.bed,tmp_dst${step}_AFR_case2.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AFR2 &>> $logfile
+$KING -b tmp_dst${step}_AFR_control2.bed,tmp_dst${step}_AFR_case2.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AFR_mds2 &>> $logfile
+
+# Make list of samples from AFR population to be removed based on the PC2 > 0.3
+awk '$8 >0.3 {print $0}' tmp_dst${step}_cc_AFR2pc.txt | sed "s/ /\t/g" > tmp_dst${step}_cc_AFR_wo_outlier2.txt
+awk 'NR>1' tmp_dst${step}_cc_AFR_wo_outlier2.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_AFR_tbr2.txt
+
+awk '$8 >0.3 {print $0}' tmp_dst${step}_cc_AFR_mds2pc.txt | sed "s/ /\t/g" > tmp_dst${step}_cc_AFR_mds_wo_outlier2.txt
+awk 'NR>1' tmp_dst${step}_cc_AFR_mds_wo_outlier2.txt | awk '{print $1, $2}' > tmp_dst${nextstep}_cc_AFR_mds_tbr2.txt
+
+# Project case samples from AMR population on control samples
+$KING -b tmp_dst${step}_AMR_control2.bed,tmp_dst${step}_AMR_case2.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AMR2 &>> $logfile
+$KING -b tmp_dst${step}_AMR_control2.bed,tmp_dst${step}_AMR_case2.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AMR_mds2 &>> $logfile
+
+
+echo -e
+step=14
+nextstep=$(($step+1))
+step7=$(($step-7))
+step12=$(($step-2))
+echo "Step $step: Update binary files of case-control samples in AFR and AMR population"
+date
+
+# These files are for MDS projecton (after removing the MHC region and LD prunning)
+# Remove samples from AFR population (PC > 0.3) - final file for PCA of case-control samples (AFR)
+$PLINK --bfile tmp_dst${step12}_AFR_cc --remove tmp_dst${step}_cc_AFR_tbr.txt --make-bed --out tmp_dst${step}_AFR_cc &>> $logfile
+awk '{print $1, $2, "PC>0.3"}' tmp_dst${step}_cc_AFR_tbr.txt | sed "s/ /\t/g" >> $sampledropccAFR
+cat tmp_dst${step}_AFR_cc.fam | awk '{print $1, $2}' > tmp_dst${step}_AFR_cc_samples.txt
+
+nout=$(cat tmp_dst${step}_AFR_cc_samples.txt | wc -l)
+echo "There are $nout Case-Control Samples in AFR population for PCA"
+
+# Remove samples from AMR population (PC > 0.3) - final file for PCA of case-control samples (AMR)
+$PLINK --bfile tmp_dst${step12}_AMR_cc --remove tmp_dst${step}_cc_AMR_tbr.txt --make-bed --out tmp_dst${step}_AMR_cc &>> $logfile
+awk '{print $1, $2, "PC>0.3"}' tmp_dst${step}_cc_AMR_tbr.txt | sed "s/ /\t/g" >> $sampledropccAMR
+cat tmp_dst${step}_AMR_cc.fam | awk '{print $1, $2}' > tmp_dst${step}_AMR_cc_samples.txt
+
+nout=$(cat tmp_dst${step}_AMR_cc_samples.txt | wc -l)
+echo "There are $nout Case-Control Samples in AMR population for PCA"
+
+# These files are final files for release (with MHC region)
+# Remove samples from AFR population (PC > 0.3) - final file of case-control samples (AFR) for data analysis
+$PLINK --bfile tmp_dst${step7}_AFR_cc --remove tmp_dst${step}_cc_AFR_tbr.txt --make-bed --out tmp_dst${nextstep}_AFR_cc &>> $logfile
+cat tmp_dst${nextstep}_AFR_cc.fam | awk '{print $1, $2}' > tmp_dst${nextstep}_AFR_cc_samples.txt
+
+nout=$(cat tmp_dst${nextstep}_AFR_cc_samples.txt | wc -l)
+echo "There are $nout Case-Control Samples in AFR population for data analysis"
+
+# Remove samples from AMR population (PC > 0.3) - final file of case-control samples (AMR) for data analysis
+$PLINK --bfile tmp_dst${step7}_AMR_cc --remove tmp_dst${step}_cc_AMR_tbr.txt --make-bed --out tmp_dst${nextstep}_AMR_cc &>> $logfile
+cat tmp_dst${nextstep}_AMR_cc.fam | awk '{print $1, $2}' > tmp_dst${nextstep}_AMR_cc_samples.txt
+
+nout=$(cat tmp_dst${nextstep}_AMR_cc_samples.txt | wc -l)
+echo "There are $nout Case-Control Samples in AMR population for data analysis"
+
+# test
+# These files are for MDS projecton (after removing the MHC region and LD prunning)
+# Remove samples from AFR population (PC > 0.3) - final file for PCA of case-control samples (AFR)
+$PLINK --bfile tmp_dst${step12}_AFR_cc2 --remove tmp_dst${step}_cc_AFR_tbr2.txt --make-bed --out tmp_dst${step}_AFR_cc2 &>> $logfile
+
+
+echo -e
+step=15
+nextstep=$(($step+1))
+step14=$(($step-1))
+echo "Step $step: Prepare AFR and AMR data for PCA and MDS projection after removing the outliers"
+date
+
+cat tmp_dst${step14}_AFR_cc.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AFR_control.txt
+cat tmp_dst${step14}_AFR_cc.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AFR_case.txt
+
+$PLINK --bfile tmp_dst${step14}_AFR_cc --keep tmp_dst${step}_AFR_control.txt --make-bed --out tmp_dst${nextstep}_AFR_control &>> $logfile
+$PLINK --bfile tmp_dst${step14}_AFR_cc --keep tmp_dst${step}_AFR_case.txt --make-bed --out tmp_dst${nextstep}_AFR_case &>> $logfile
+
+cat tmp_dst${step14}_AMR_cc.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AMR_control.txt
+cat tmp_dst${step14}_AMR_cc.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AMR_case.txt
+
+$PLINK --bfile tmp_dst${step14}_AMR_cc --keep tmp_dst${step}_AMR_control.txt --make-bed --out tmp_dst${nextstep}_AMR_control &>> $logfile
+$PLINK --bfile tmp_dst${step14}_AMR_cc --keep tmp_dst${step}_AMR_case.txt --make-bed --out tmp_dst${nextstep}_AMR_case &>> $logfile
+
+# test
+cat tmp_dst${step14}_AFR_cc2.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_dst${step}_AFR_control2.txt
+cat tmp_dst${step14}_AFR_cc2.fam | awk '$NF ~ /2/ {print $1, $2}' > tmp_dst${step}_AFR_case2.txt
+
+$PLINK --bfile tmp_dst${step14}_AFR_cc2 --keep tmp_dst${step}_AFR_control2.txt --make-bed --out tmp_dst${nextstep}_AFR_control2 &>> $logfile
+$PLINK --bfile tmp_dst${step14}_AFR_cc2 --keep tmp_dst${step}_AFR_case2.txt --make-bed --out tmp_dst${nextstep}_AFR_case2 &>> $logfile
+
+
+echo -e
+step=16
+nextstep=$(($step+1))
+echo "Step $step: PCA and MDS projection of AFR and AMR data after removing the outliers"
+date
+
+# Project case samples from AFR population on control samples
+$KING -b tmp_dst${step}_AFR_control.bed,tmp_dst${step}_AFR_case.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AFR &>> $logfile
+$KING -b tmp_dst${step}_AFR_control.bed,tmp_dst${step}_AFR_case.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AFR_mds &>> $logfile
+
+# Project case samples from AMR population on control samples
+$KING -b tmp_dst${step}_AMR_control.bed,tmp_dst${step}_AMR_case.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AMR &>> $logfile
+$KING -b tmp_dst${step}_AMR_control.bed,tmp_dst${step}_AMR_case.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AMR_mds &>> $logfile
+
+# test
+# Project case samples from AFR population on control samples
+$KING -b tmp_dst${step}_AFR_control2.bed,tmp_dst${step}_AFR_case2.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AFR2 &>> $logfile
+$KING -b tmp_dst${step}_AFR_control2.bed,tmp_dst${step}_AFR_case2.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AFR_mds2 &>> $logfile
+
+# 2022-04-01 -> test to see if --pca and --mds has changed in KING
+# everything is the same
+# Project case samples from AFR population on control samples
+$KING -b tmp_dst${step}_AFR_control.bed,tmp_dst${step}_AFR_case.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AFR2 &>> $logfile
+$KING -b tmp_dst${step}_AFR_control.bed,tmp_dst${step}_AFR_case.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AFR_mds2 &>> $logfile
+
+# Project case samples from AMR population on control samples
+$KING -b tmp_dst${step}_AMR_control.bed,tmp_dst${step}_AMR_case.bed --pca --proj --rplot --prefix tmp_dst${step}_cc_AMR2 &>> $logfile
+$KING -b tmp_dst${step}_AMR_control.bed,tmp_dst${step}_AMR_case.bed --mds --proj --rplot --prefix tmp_dst${step}_cc_AMR_mds2 &>> $logfile
+
+
+echo -e
+step=17
+step16=$(($step-1))
+step15=$(($step-2))
+step5=$(($step-12))
+step2=$(($step-15))
+echo "Step $step: Data release into $releasepath"
+date
+
+# Copy final files into Data_release-2020-12-03 folder
+if [ ! -d $releasepath ]; then
+  mkdir $releasepath
+  cp tmp_dst${step5}_family.fam $releasepath/$releasefamily.fam
+  cp tmp_dst${step5}_family.bim $releasepath/$releasefamily.bim
+  cp tmp_dst${step5}_family.bed $releasepath/$releasefamily.bed
+  cp $finalpath/$cleandata.cov $releasepath/$releasefamily.cov
+  cp tmp_dst${step2}_family_anc_InferredAncestry.txt $releasepath/$ancfamily.txt
+
+  cp tmp_dst${step5}_cc.fam $releasepath/$releasecc.fam
+  cp tmp_dst${step5}_cc.bim $releasepath/$releasecc.bim
+  cp tmp_dst${step5}_cc.bed $releasepath/$releasecc.bed
+  cp tmp_dst${step2}_cc_anc_InferredAncestry.txt $releasepath/$anccc.txt
+
+  cp tmp_dst${step15}_AFR_cc.fam $releasepath/$releaseccAFR.fam
+  cp tmp_dst${step15}_AFR_cc.bim $releasepath/$releaseccAFR.bim
+  cp tmp_dst${step15}_AFR_cc.bed $releasepath/$releaseccAFR.bed
+  cp tmp_dst${step16}_cc_AFR_pcplot.pdf $releasepath/$ancplotAFR.pdf
+  cp tmp_dst${step16}_cc_AFRpc.txt $releasepath/$pcAFR.txt
+
+  cp tmp_dst${step15}_AMR_cc.fam $releasepath/$releaseccAMR.fam
+  cp tmp_dst${step15}_AMR_cc.bim $releasepath/$releaseccAMR.bim
+  cp tmp_dst${step15}_AMR_cc.bed $releasepath/$releaseccAMR.bed
+  cp tmp_dst${step16}_cc_AMR_pcplot.pdf $releasepath/$ancplotAMR.pdf
+  cp tmp_dst${step16}_cc_AMRpc.txt $releasepath/$pcAMR.txt
+fi
+
+
+echo -e
+step=18
+step16=$(($step-2))
+step15=$(($step-3))
+step5=$(($step-13))
+echo "Step $step: Remove SNP resulted from technical error"
+date
+
+# Remove SNP resulted from technical error (based on the logistic regression analysis)
+# The probe used to genotype this SNPs binds to two independent regions in the genome (one region is in chromosome 6/HLA region and the second one is in chromosome 2)
+echo "exm244817" > tmp_dst${step}_SNP_tbr.txt
+awk '{print $1, "technical_error"}' tmp_dst${step}_SNP_tbr.txt | sed "s/ /\t/g" >> $snpdrop
+
+$PLINK --bfile tmp_dst${step5}_family --exclude tmp_dst${step}_SNP_tbr.txt --make-bed --out tmp_dst${step}_family &>> $logfile
+$PLINK --bfile tmp_dst${step5}_cc --exclude tmp_dst${step}_SNP_tbr.txt --make-bed --out tmp_dst${step}_cc &>> $logfile
+$PLINK --bfile tmp_dst${step15}_AFR_cc --exclude tmp_dst${step}_SNP_tbr.txt --make-bed --out tmp_dst${step}_AFR_cc &>> $logfile
+$PLINK --bfile tmp_dst${step15}_AMR_cc --exclude tmp_dst${step}_SNP_tbr.txt --make-bed --out tmp_dst${step}_AMR_cc &>> $logfile
+
+
+echo -e
+step=19
+step18=$(($step-1))
+step16=$(($step-3))
+step2=$(($step-17))
+echo "Step $step: Data release into $releasepath2"
+date
+
+# Copiy final files into Data_release-2020-12-16 folder 
+# Files in folder Data_release-2020-12-16 are before population structure analysis changes in KING
+if [ ! -d $releasepath2 ]; then
+  mkdir $releasepath2
+  cp tmp_dst${step18}_family.fam $releasepath2/$releasefamily2.fam
+  cp tmp_dst${step18}_family.bim $releasepath2/$releasefamily2.bim
+  cp tmp_dst${step18}_family.bed $releasepath2/$releasefamily2.bed
+  cp $finalpath/$cleandata.cov $releasepath2/$releasefamily2.cov
+  cp tmp_dst${step2}_family_anc_InferredAncestry.txt $releasepath2/$ancfamily.txt
+
+  cp tmp_dst${step18}_cc.fam $releasepath2/$releasecc2.fam
+  cp tmp_dst${step18}_cc.bim $releasepath2/$releasecc2.bim
+  cp tmp_dst${step18}_cc.bed $releasepath2/$releasecc2.bed
+  cp tmp_dst${step2}_cc_anc_InferredAncestry.txt $releasepath2/$anccc.txt
+
+  cp tmp_dst${step18}_AFR_cc.fam $releasepath2/$releaseccAFR2.fam
+  cp tmp_dst${step18}_AFR_cc.bim $releasepath2/$releaseccAFR2.bim
+  cp tmp_dst${step18}_AFR_cc.bed $releasepath2/$releaseccAFR2.bed
+  cp tmp_dst${step16}_cc_AFR_pcplot.pdf $releasepath2/$ancplotAFR.pdf
+  cp tmp_dst${step16}_cc_AFRpc.txt $releasepath2/$pcAFR.txt
+
+  cp tmp_dst${step18}_AMR_cc.fam $releasepath2/$releaseccAMR2.fam
+  cp tmp_dst${step18}_AMR_cc.bim $releasepath2/$releaseccAMR2.bim
+  cp tmp_dst${step18}_AMR_cc.bed $releasepath2/$releaseccAMR2.bed
+  cp tmp_dst${step16}_cc_AMR_pcplot.pdf $releasepath2/$ancplotAMR.pdf
+  cp tmp_dst${step16}_cc_AMRpc.txt $releasepath2/$pcAMR.txt
+fi
+
+
+echo -e
+step=20
+step18=$((step-2))
+step16=$((step-4))
+step2=$((step-18))
+echo "Step $step: Data release into $releasepath3"
+date
+
+# Make list of binary files to merge
+echo "tmp_dst${step18}_AMR_cc.bed tmp_dst${step18}_AMR_cc.bim tmp_dst${step18}_AMR_cc.fam" | sed "s/ /\t/g" > tmp_dst${step}_files_to_merge.txt
+echo "tmp_dst${step18}_family.bed tmp_dst${step18}_family.bim tmp_dst${step18}_family.fam" | sed "s/ /\t/g" >> tmp_dst${step}_files_to_merge.txt
+
+# Merge final clean data 
+$PLINK --bfile tmp_dst${step18}_AFR_cc --merge-list tmp_dst${step}_files_to_merge.txt --make-bed --out tmp_dst${step}_AFR_AMR_family &>> $logfile
+
+
+# Copy final files into Data_release-2021-01-20 folder 
+# Files in folder Data_release-2021-01-20 are after population structure analysis changes in KING
+if [ ! -d $releasepath3 ]; then
+  mkdir $releasepath3
+  cp tmp_dst${step18}_family.fam $releasepath3/$releasefamily3.fam
+  cp tmp_dst${step18}_family.bim $releasepath3/$releasefamily3.bim
+  cp tmp_dst${step18}_family.bed $releasepath3/$releasefamily3.bed
+  cp $finalpath/$cleandata.cov $releasepath3/$releasefamily3.cov
+  cp tmp_dst${step2}_family_anc_InferredAncestry.txt $releasepath3/$ancfamily.txt
+
+  cp tmp_dst${step18}_cc.fam $releasepath3/$releasecc3.fam
+  cp tmp_dst${step18}_cc.bim $releasepath3/$releasecc3.bim
+  cp tmp_dst${step18}_cc.bed $releasepath3/$releasecc3.bed
+  cp tmp_dst${step2}_cc_anc_InferredAncestry.txt $releasepath3/$anccc.txt
+
+  cp tmp_dst${step18}_AFR_cc.fam $releasepath3/$releaseccAFR3.fam
+  cp tmp_dst${step18}_AFR_cc.bim $releasepath3/$releaseccAFR3.bim
+  cp tmp_dst${step18}_AFR_cc.bed $releasepath3/$releaseccAFR3.bed
+  cp tmp_dst${step16}_cc_AFR_pcplot.pdf $releasepath3/$ancplotAFR.pdf
+  cp tmp_dst${step16}_cc_AFRpc.txt $releasepath3/$pcAFR.txt
+
+  cp tmp_dst${step18}_AMR_cc.fam $releasepath3/$releaseccAMR3.fam
+  cp tmp_dst${step18}_AMR_cc.bim $releasepath3/$releaseccAMR3.bim
+  cp tmp_dst${step18}_AMR_cc.bed $releasepath3/$releaseccAMR3.bed
+  cp tmp_dst${step16}_cc_AMR_pcplot.pdf $releasepath3/$ancplotAMR.pdf
+  cp tmp_dst${step16}_cc_AMRpc.txt $releasepath3/$pcAMR.txt
+
+  cp tmp_dst${step}_AFR_AMR_family.fam $releasepath3/$release3.fam
+  cp tmp_dst${step}_AFR_AMR_family.bim $releasepath3/$release3.bim
+  cp tmp_dst${step}_AFR_AMR_family.bed $releasepath3/$release3.bed
+fi
+
+
+echo -e
+step=21
+nextstep=$(($step+1))
+echo "Step $step: Population structure analysis on released data (2021-01-20)"
+date
+
+$PLINK --bfile $releasepath3/$releasecc3 --remove $sampledropcc --make-bed --out tmp_dst${step}_cc_1 &>> $logfile
+$PLINK --bfile tmp_dst${step}_cc_1 --remove $sampledropccAFR --make-bed --out tmp_dst${step}_cc_2 &>> $logfile
+$PLINK --bfile tmp_dst${step}_cc_2 --remove $sampledropccAMR --make-bed --out tmp_dst${step}_cc &>> $logfile
+
+# Separate the case-control samples based on acestry
+$KING -b $finalpath/../Downstream_data/KGref,tmp_dst${step}_cc --mds --proj --rplot --prefix tmp_dst${step}_cc_anc &>> $logfile
+
+# Separate the family samples based on acestry
+$KING -b $finalpath/../Downstream_data/KGref,$releasepath3/$releasefamily3 --mds --proj --rplot --prefix tmp_dst${step}_family_anc &>> $logfile
+
+# Separate AFR samples 
+$KING -b $finalpath/../Downstream_data/KGref,$releasepath3/$releaseccAFR3 --mds --proj --rplot --prefix tmp_dst${step}_AFR_anc &>> $logfile
+
+# Separate AMR samples 
+$KING -b $finalpath/../Downstream_data/KGref,$releasepath3/$releaseccAMR3 --mds --proj --rplot --prefix tmp_dst${step}_AMR_anc &>> $logfile
