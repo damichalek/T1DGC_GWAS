@@ -1,0 +1,151 @@
+#!/bin/bash
+
+echo "PCA for T1DGC Humancore Exome data, Jun 30 2022, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+logfile=pca.log
+date > $logfile
+finalname=T1DGC_HCE
+
+# genotyped final release data
+
+geno=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+geno_pc=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20/PCs_plink
+
+echo -e
+step=7
+step6=$((step-1))
+echo "Step $step: Remove MHC region"
+date
+
+# Exclude the MHC region (position based on GRCh37/hg19) - 3 588 SNPs -> extended boundries (5 711 SNPs)
+# https://www.ncbi.nlm.nih.gov/grc/human/regions/MHC?asm=GRCh37
+
+$PLINK --bfile $geno/T1DGC_HCE_pseudo_cc-2021-01-20 --chr 6 --from-bp 23477797 --to-bp 38448354 --make-bed --out tmp_pcc${step}_pseudo_cc_MHC &>> $logfile
+awk '{print $2}' tmp_pcc${step}_pseudo_cc_MHC.bim > tmp_pcc${step}_MHC_SNPs_tbr.txt
+$PLINK --bfile $geno/T1DGC_HCE_pseudo_cc-2021-01-20 --exclude tmp_pcc${step}_MHC_SNPs_tbr.txt --maf 0.05 --make-bed --out tmp_pcc${step}_pseudo_cc_without_MHC &>> $logfile
+
+# EUR (pcc)
+$PLINK --bfile $geno/T1DGC_HCE_pseudo_cc_EUR-2021-01-20 --chr 6 --from-bp 23477797 --to-bp 38448354 --make-bed --out tmp_pcc${step}_pseudo_cc_EUR_MHC &>> $logfile
+awk '{print $2}' tmp_pcc${step}_pseudo_cc_EUR_MHC.bim > tmp_pcc${step}_EUR_MHC_SNPs_tbr.txt
+$PLINK --bfile $geno/T1DGC_HCE_pseudo_cc_EUR-2021-01-20 --exclude tmp_pcc${step}_EUR_MHC_SNPs_tbr.txt --maf 0.05 --make-bed --out tmp_pcc${step}_pseudo_cc_EUR_without_MHC &>> $logfile
+
+# AFR
+$PLINK --bfile $geno/T1DGC_HCE_cc_AFR-2021-01-20 --chr 6 --from-bp 23477797 --to-bp 38448354 --make-bed --out tmp_pcc${step}_AFR_MHC &>> $logfile
+awk '{print $2}' tmp_pcc${step}_AFR_MHC.bim > tmp_pcc${step}_AFR_MHC_SNPs_tbr.txt
+$PLINK --bfile $geno/T1DGC_HCE_cc_AFR-2021-01-20 --exclude tmp_pcc${step}_AFR_MHC_SNPs_tbr.txt --maf 0.05 --make-bed --out tmp_pcc${step}_AFR_without_MHC &>> $logfile
+
+# AMR
+$PLINK --bfile $geno/T1DGC_HCE_cc_AMR-2021-01-20 --chr 6 --from-bp 23477797 --to-bp 38448354 --make-bed --out tmp_pcc${step}_AMR_MHC &>> $logfile
+awk '{print $2}' tmp_pcc${step}_AMR_MHC.bim > tmp_pcc${step}_AMR_MHC_SNPs_tbr.txt
+$PLINK --bfile $geno/T1DGC_HCE_cc_AMR-2021-01-20 --exclude tmp_pcc${step}_AMR_MHC_SNPs_tbr.txt --maf 0.05 --make-bed --out tmp_pcc${step}_AMR_without_MHC &>> $logfile
+
+echo -e
+step=8
+step7=$(($step-1))
+echo "Step $step: LD-pruning"
+date
+
+# Performs LD-pruning on pseudo-case control samples
+# The command above that specifies 50 5 0.5 would 
+# a) consider a window of 50 SNPs, 
+# b) calculate LD between each pair of SNPs in the window, 
+# b) remove one of a pair of SNPs if the LD is greater than 0.5, 
+# c) shift the window 5 SNPs forward and repeat the procedure
+
+$PLINK --bfile tmp_pcc${step7}_pseudo_cc_without_MHC --indep-pairwise 50 5 0.5 --out tmp_pcc${step}_pseudo_cc_LD_pruning &>> $logfile
+$PLINK --bfile tmp_pcc${step7}_pseudo_cc_without_MHC --exclude tmp_pcc${step}_pseudo_cc_LD_pruning.prune.out --make-bed --out tmp_pcc${step}_pseudo_cc_without_MHC &>> $logfile
+
+# EUR (pcc)
+$PLINK --bfile tmp_pcc${step7}_pseudo_cc_EUR_without_MHC --indep-pairwise 50 5 0.5 --out tmp_pcc${step}_pseudo_cc_EUR_LD_pruning &>> $logfile
+$PLINK --bfile tmp_pcc${step7}_pseudo_cc_EUR_without_MHC --exclude tmp_pcc${step}_pseudo_cc_EUR_LD_pruning.prune.out --make-bed --out tmp_pcc${step}_pseudo_cc_EUR_without_MHC &>> $logfile
+
+# AFR
+$PLINK --bfile tmp_pcc${step7}_AFR_without_MHC --indep-pairwise 50 5 0.5 --out tmp_pcc${step}_AFR_LD_pruning &>> $logfile
+$PLINK --bfile tmp_pcc${step7}_AFR_without_MHC --exclude tmp_pcc${step}_AFR_LD_pruning.prune.out --make-bed --out tmp_pcc${step}_AFR_without_MHC &>> $logfile
+
+# AMR
+$PLINK --bfile tmp_pcc${step7}_AMR_without_MHC --indep-pairwise 50 5 0.5 --out tmp_pcc${step}_AMR_LD_pruning &>> $logfile
+$PLINK --bfile tmp_pcc${step7}_AMR_without_MHC --exclude tmp_pcc${step}_AMR_LD_pruning.prune.out --make-bed --out tmp_pcc${step}_AMR_without_MHC &>> $logfile
+
+echo -e
+step=9
+step8=$((step-1))
+echo "Step $step: PCA and MDS projection of pseudo-case control data"
+date
+
+# Project case samples from pseudo-case control dataset on control samples
+$KING -b tmp_pcc${step8}_pseudo_cc_without_MHC.bed --pca --proj --rplot --prefix tmp_pcc${step}_pseudo_cc &>> $logfile
+$KING -b tmp_pcc${step8}_pseudo_cc_without_MHC.bed --mds --proj --rplot --prefix tmp_pcc${step}_pseudo_cc_mds &>> $logfile
+
+# EUR (pcc)
+$KING -b tmp_pcc${step8}_pseudo_cc_EUR_without_MHC.bed --pca --proj --rplot --prefix tmp_pcc${step}_pseudo_cc_EUR &>> $logfile
+$KING -b tmp_pcc${step8}_pseudo_cc_EUR_without_MHC.bed --mds --proj --rplot --prefix tmp_pcc${step}_pseudo_cc_EUR_mds &>> $logfile
+
+# AFR
+$KING -b tmp_pcc${step8}_AFR_without_MHC.bed --pca --proj --rplot --prefix tmp_pcc${step}_AFR &>> $logfile
+$KING -b tmp_pcc${step8}_AFR_without_MHC.bed --mds --proj --rplot --prefix tmp_pcc${step}_AFR_mds &>> $logfile
+
+# AMR
+$KING -b tmp_pcc${step8}_AMR_without_MHC.bed --pca --proj --rplot --prefix tmp_pcc${step}_AMR &>> $logfile
+$KING -b tmp_pcc${step8}_AMR_without_MHC.bed --mds --proj --rplot --prefix tmp_pcc${step}_AMR_mds &>> $logfile
+
+
+echo -e
+step=10
+step8=$((step-2))
+echo "Step $step: PCA projection of pseudo-case control data in PLINK2"
+date
+
+# Compare the results with PLINK2 PCA projection
+cat tmp_pcc${step8}_pseudo_cc_without_MHC.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_pcc${step}_pseudo_cc_controls.txt
+$PLINK --bfile tmp_pcc${step8}_pseudo_cc_without_MHC --keep tmp_pcc${step}_pseudo_cc_controls.txt --make-bed --out tmp_pcc${step}_pseudo_cc_control &>> $logfile
+
+echo "Run PCA and save variance weights"
+plink2 --bfile tmp_pcc${step}_pseudo_cc_control --freq --pca var-wts --out tmp_pcc${step}_pseudo_cc_control_pca &>> $logfile
+
+echo "Use --score option for PCA projection"
+plink2 --bfile tmp_pcc${step8}_pseudo_cc_without_MHC --read-freq tmp_pcc${step}_pseudo_cc_control_pca.afreq --score tmp_pcc${step}_pseudo_cc_control_pca.eigenvec.var  2 3 header-read no-mean-imputation variance-standardize --score-col-nums 5-14 --out tmp_pcc${step}_pseudo_cc &>> $logfile
+
+# EUR (pcc)
+cat tmp_pcc${step8}_pseudo_cc_EUR_without_MHC.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_pcc${step}_pseudo_cc_EUR_controls.txt
+$PLINK --bfile tmp_pcc${step8}_pseudo_cc_EUR_without_MHC --keep tmp_pcc${step}_pseudo_cc_EUR_controls.txt --make-bed --out tmp_pcc${step}_pseudo_cc_EUR_control &>> $logfile
+
+echo "Run PCA and save variance weights"
+plink2 --bfile tmp_pcc${step}_pseudo_cc_EUR_control --freq --pca var-wts --out tmp_pcc${step}_pseudo_cc_EUR_control_pca &>> $logfile
+
+echo "Use --score option for PCA projection"
+plink2 --bfile tmp_pcc${step8}_pseudo_cc_EUR_without_MHC --read-freq tmp_pcc${step}_pseudo_cc_EUR_control_pca.afreq --score tmp_pcc${step}_pseudo_cc_EUR_control_pca.eigenvec.var  2 3 header-read no-mean-imputation variance-standardize --score-col-nums 5-14 --out tmp_pcc${step}_pseudo_cc_EUR &>> $logfile
+
+# AFR
+cat tmp_pcc${step8}_AFR_without_MHC.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_pcc${step}_AFR_controls.txt
+$PLINK --bfile tmp_pcc${step8}_AFR_without_MHC --keep tmp_pcc${step}_AFR_controls.txt --make-bed --out tmp_pcc${step}_AFR_control &>> $logfile
+
+echo "Run PCA and save variance weights"
+plink2 --bfile tmp_pcc${step}_AFR_control --freq --pca var-wts --out tmp_pcc${step}_AFR_control_pca &>> $logfile
+
+echo "Use --score option for PCA projection"
+plink2 --bfile tmp_pcc${step8}_AFR_without_MHC --read-freq tmp_pcc${step}_AFR_control_pca.afreq --score tmp_pcc${step}_AFR_control_pca.eigenvec.var  2 3 header-read no-mean-imputation variance-standardize --score-col-nums 5-14 --out tmp_pcc${step}_AFR &>> $logfile
+
+# AMR
+cat tmp_pcc${step8}_AMR_without_MHC.fam | awk '$NF ~ /1/ {print $1, $2}' > tmp_pcc${step}_AMR_controls.txt
+$PLINK --bfile tmp_pcc${step8}_AMR_without_MHC --keep tmp_pcc${step}_AMR_controls.txt --make-bed --out tmp_pcc${step}_AMR_control &>> $logfile
+
+echo "Run PCA and save variance weights"
+plink2 --bfile tmp_pcc${step}_AMR_control --freq --pca var-wts --out tmp_pcc${step}_AMR_control_pca &>> $logfile
+
+echo "Use --score option for PCA projection"
+plink2 --bfile tmp_pcc${step8}_AMR_without_MHC --read-freq tmp_pcc${step}_AMR_control_pca.afreq --score tmp_pcc${step}_AMR_control_pca.eigenvec.var  2 3 header-read no-mean-imputation variance-standardize --score-col-nums 5-14 --out tmp_pcc${step}_AMR &>> $logfile
+
+
+echo -e
+step=17
+step10=$((step-7))
+echo "Step $step: Copy final PCs (from plink) to designated folders"
+date
+
+cp tmp_pcc10_pseudo_cc.sscore $geno_pc/T1DGC_HCE_pc_pseudo_cc.txt
+cp tmp_pcc10_pseudo_cc_EUR.sscore $geno_pc/T1DGC_HCE_pc_pseudo_cc_EUR.txt
+cp tmp_pcc10_AFR.sscore $geno_pc/T1DGC_HCE_pc_AFR.txt
+cp tmp_pcc10_AMR.sscore $geno_pc/T1DGC_HCE_pc_AMR.txt
