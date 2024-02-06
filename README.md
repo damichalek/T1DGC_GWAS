@@ -19,6 +19,9 @@ bash dst.bsh
 bash pseudo_cc.bsh
 ```
 7. PCA
+```bash
+bash pca.bsh
+```
 
 ## Imputation
 1. Prepare data for imputation
