@@ -10,15 +10,18 @@ Genotyped data underwent following steps:
 ```bash
 bash qc.bsh
 ```
-3. Population structure and ancestry inference (+QC)
+
+2. Population structure and ancestry inference (+QC)
 ```bash
 bash dst.bsh
 ```
-5. Generation of pseudo-case pseudo-control individuals from family dataset
+
+3. Generation of pseudo-case pseudo-control individuals from family dataset
 ```bash
 bash pseudo_cc.bsh
 ```
-7. Principal Component Analysis (PCA)
+
+4. Principal Component Analysis (PCA)
 ```bash
 bash pca.bsh
 ```
@@ -29,8 +32,10 @@ bash pca.bsh
 # uses Rayner perl script (HRC-1000G-check-bim-NoReadKey.pl)
 bash pre_imputation.bsh
 ```
-3. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) (1.5.7 and 1.6.6) and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!) (1.5.8)
-4. Download, unzip and filter imputation results
+
+2. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) (1.5.7 and 1.6.6) and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!) (1.5.8)
+
+3. Download, unzip and filter imputation results
 ```bash
 bash imp_filter.bsh
 
@@ -52,6 +57,7 @@ bash SAIGE/saige_slurm_AFR_imp_dosage.bsh
 bash SAIGE/saige_slurm_AMR_imp_dosage.bsh
 bash SAIGE/saige_slurm_pcc_imp_dosage.bsh
 ```
+
 2. Frailty mixed model regression in GATE for each ancestry group (AFR, AMR, EUR)
 ```bash
 # prepare GATE input files
@@ -62,7 +68,7 @@ bash GATE/gate_slurm_AFR_imp_dosage.bsh
 bash GATE/gate_slurm_AMR_imp_dosage.bsh
 bash GATE/gate_slurm_pcc_imp_dosage.bsh
 ```
-```
+
 3. Meta-analysis in METAL for both T1D risk and age at onset
 ```bash
 # uses metal scripts
