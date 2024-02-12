@@ -43,8 +43,32 @@ bash imp_vcf.bsh
 
 ## Association analyses
 1. Logistic mixed model regression in SAIGE for each ancestry group (AFR, AMR, EUR)
+```bash
+# prepare SAIGE input files
+bash SAIGE/input_saige.bsh
+
+# run SAIGE
+bash SAIGE/saige_slurm_AFR_imp_dosage.bsh
+bash SAIGE/saige_slurm_AMR_imp_dosage.bsh
+bash SAIGE/saige_slurm_pcc_imp_dosage.bsh
+```
 2. Frailty mixed model regression in GATE for each ancestry group (AFR, AMR, EUR)
+```bash
+# prepare GATE input files
+bash GATE/input_saige.bsh
+
+# run GATE
+bash GATE/gate_slurm_AFR_imp_dosage.bsh
+bash GATE/gate_slurm_AMR_imp_dosage.bsh
+bash GATE/gate_slurm_pcc_imp_dosage.bsh
+```
+```
 3. Meta-analysis in METAL for both T1D risk and age at onset
+```bash
+# uses metal scripts
+bash SAIGE/saige_fullGRM.bsh
+bash GATE/gate_fullGRM.bsh
+```
 4. HLA association analyses in SAIGE and GATE
 5. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
 
