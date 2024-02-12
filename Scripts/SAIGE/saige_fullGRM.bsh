@@ -1,0 +1,190 @@
+#!/bin/bash
+
+echo "Meta-analysis of T1DGC Humancore Exome imputed data processed via SAIGE (AFR, AMR, Pseudo-case control, MAF > 0.01, R2 > 0.3, MI < 0.1), Jul 22 2022, by Dominika Michalek"
+
+PLINK=plink1.9
+KING=king
+METAL=/ceph/CPHG/T1DGC/USERS/dam8mt/METAL/generic-metal/metal
+logfile=saige.log
+date > $logfile
+finalname=T1DGC_HCE
+
+AFR=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/SAIGE_imputed_data-2022-07-21/fullGRM/output/AFR
+AMR=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/SAIGE_imputed_data-2022-07-21/fullGRM/output/AMR
+Pseudo_cc=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/SAIGE_imputed_data-2022-07-21/fullGRM/output/Pseudo_cc
+
+script=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/SAIGE_imputed_data-2022-07-21/fullGRM/Script
+
+# AFR, AMR, Pseudo-case control meta-analysis (MAF > 0.01, R2 > 0.3, MI < 0.1)
+metalname=metal-2022-07-22-dosage
+
+# BETA and SE
+metalname3=metal-2022-09-08-dosage
+metalname5=metal-2023-12-12-dosage # Heterogeneity analysis
+
+# For AFR and AMR meta-analysis only (MAF > 0.01, R2 > 0.3, MI < 0.1)
+metalname2=metal-2022-07-23-dosage
+
+# BETA and SE
+metalname4=metal-2022-09-09-dosage
+metalname6=metal-2023-12-13-dosage # Heterogeneity analysis
+
+# imputed final release data
+impAFR=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/AFR
+impAMR=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/AMR
+impPCC=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/Pseudo_cc
+imp=/ceph/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/T1DGC
+
+
+echo -e
+step=1
+echo "Step $step: Prepare files for meta-analysis in METAL (MAF > 0.01)"
+date
+
+# AFR (MAF > 0.01) 
+echo "CHR POS SNP Allele1 Allele2 AF_Allele2 N BETA SE P DIRECTION" | sed "s/ /\t/g" > tmp_saige${step}_AFR_dosage_final.txt
+for i in {1..22}; do
+  awk 'NR>1' $AFR/HCE_AFR_imp_chr${i}.SAIGE.vcf.dosage.txt | awk '{if($9<0){print $1, $2, $3, $4, $5, $7, $18+$19, $9, $10, $13, "-"}else{print $1, $2, $3, $4, $5, $7, $18+$19, $9, $10, $13, "+"}}' | sed "s/ /\t/g" >> tmp_saige${step}_AFR_dosage_final.txt
+done
+
+# FOR ASHG 2022 (no BETA, so the icons are dots and not triangles)
+awk '{print $1, $2, $3, $4, $5, $6, $10}' tmp_saige${step}_AFR_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_AFR_dosage_final_small.txt
+
+# AMR (MAF > 0.01) 
+echo "CHR POS SNP Allele1 Allele2 AF_Allele2 N BETA SE P DIRECTION" | sed "s/ /\t/g" > tmp_saige${step}_AMR_dosage_final.txt
+for i in {1..22}; do
+  awk 'NR>1' $AMR/HCE_AMR_imp_chr${i}.SAIGE.vcf.dosage.txt | awk '{if($9<0){print $1, $2, $3, $4, $5, $7, $18+$19, $9, $10, $13, "-"}else{print $1, $2, $3, $4, $5, $7, $18+$19, $9, $10, $13, "+"}}' | sed "s/ /\t/g" >> tmp_saige${step}_AMR_dosage_final.txt
+done
+
+# FOR ASHG 2022 (no BETA, so the icons are dots and not triangles)
+awk '{print $1, $2, $3, $4, $5, $6, $10}' tmp_saige${step}_AMR_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_AMR_dosage_final_small.txt
+
+# Pseudo-case control (MAF > 0.01) 
+echo "CHR POS SNP Allele1 Allele2 AF_Allele2 N BETA SE P DIRECTION" | sed "s/ /\t/g" > tmp_saige${step}_pseudo_cc_dosage_final.txt
+for i in {1..22}; do
+  awk 'NR>1' $Pseudo_cc/HCE_pcc_imp_chr${i}.SAIGE.vcf.dosage.txt | awk '{if($9<0){print $1, $2, $3, $4, $5, $7, $18+$19, $9, $10, $13, "-"}else{print $1, $2, $3, $4, $5, $7, $18+$19, $9, $10, $13, "+"}}' | sed "s/ /\t/g" >> tmp_saige${step}_pseudo_cc_dosage_final.txt
+done
+
+# FOR ASHG 2022 (no BETA, so the icons are dots and not triangles)
+awk '{print $1, $2, $3, $4, $5, $6, $10}' tmp_saige${step}_pseudo_cc_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_pseudo_cc_dosage_final_small.txt
+
+
+echo -e
+step=2
+echo "Step $step: Run METAL"
+date
+
+# With DIRECTION (+ and -) - DOSAGE
+$METAL $script/${metalname}.txt > ${metalname}.out
+
+
+echo -e
+step=3
+echo "Step $step: Prepare files for LOCUS ZOOM"
+date
+
+awk -v file=${metalname}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $imp/${finalname}_imp.bim > tmp_saige${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 Z P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $11, $12, $13, "chr"$1":"$4}' tmp_saige${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $7, $9}' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+# seperate results by chromosome (for table) - DOSAGE
+for i in {1..22}; do
+  echo "CHR SNP BP A1 A2 Z P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_saige${step}_chr${i}_LOCUS_ZOOM_dosage_final.txt
+  awk 'NR>1' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | awk -v var=${i} '{if($1==var){print $0}}' | sed "s/ /\t/g" >> tmp_saige${step}_chr${i}_LOCUS_ZOOM_dosage_final.txt
+done
+
+
+echo -e
+step=4
+echo "Step $step: Run METAL (AFR and AMR) (R2 > 0.3, MAF > 0.01, MI < 0.1)"
+date
+
+# With DIRECTION (+ and -) - DOSAGE
+$METAL $script/${metalname2}.txt > ${metalname2}.out
+
+
+echo -e
+step=5
+echo "Step $step: Prepare files for LOCUS ZOOM (AFR and AMR)"
+date
+
+awk -v file=${metalname2}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $imp/${finalname}_imp.bim > tmp_saige${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 Z P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $11, $12, $13, "chr"$1":"$4}' tmp_saige${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $7, $9}' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+
+echo -e
+step=6
+echo "Step $step: Calculate frequency (pseudo_cc)"
+date
+
+# Produce the A2 allele (NON_EFFECT_ALLELE) - FREQUENCY (MAF) - to check the SNPs ignored in meta-analysis
+for i in {1..22}; do
+  $PLINK --bfile $impAFR/${finalname}_imp_AFR_chr${i} --freq --out tmp_saige${step}_AFR_chr${i}_freq &>> $logfile
+  $PLINK --bfile $impAMR/${finalname}_imp_AMR_chr${i} --freq --out tmp_saige${step}_AMR_chr${i}_freq &>> $logfile
+  $PLINK --bfile $impPCC/${finalname}_imp_pseudo_cc_chr${i} --freq --out tmp_saige${step}_pseudo_cc_chr${i}_freq &>> $logfile
+  #$PLINK --bfile $imp/${finalname}_imp_chr${i} --freq --out tmp_saige${step}_chr${i}_freq &>> $logfile
+done
+
+
+echo -e
+step=7
+echo "Step $step: Run METAL"
+date
+
+# With BETA and SE
+$METAL $script/${metalname3}.txt > ${metalname3}.out
+$METAL $script/${metalname5}.txt > ${metalname5}.out # heterogeneity analysis
+
+
+echo -e
+step=8
+echo "Step $step: Prepare files for LOCUS ZOOM"
+date
+
+awk -v file=${metalname3}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $imp/${finalname}_imp.bim > tmp_saige${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 AF_A1 BETA SE P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $10, $14, $15, $16, $17, "chr"$1":"$4}' tmp_saige${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $6, $7, $8, $9}' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+# FOR ASHG 2022 (no BETA, so the icons are dots and not triangles)
+awk '{print $1, $2, $3, $4, $5, $6, $9}' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_small_final2.txt
+
+# seperate results by chromosome (for table) - DOSAGE
+for i in {1..22}; do
+  echo "CHR SNP BP A1 A2 AF_A1 BETA SE P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_saige${step}_chr${i}_LOCUS_ZOOM_dosage_final.txt
+  awk 'NR>1' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | awk -v var=${i} '{if($1==var){print $0}}' | sed "s/ /\t/g" >> tmp_saige${step}_chr${i}_LOCUS_ZOOM_dosage_final.txt
+done
+
+
+echo -e
+step=9
+echo "Step $step: Run METAL (AFR and AMR) (R2 > 0.3, MAF > 0.01, MI < 0.1)"
+date
+
+# With BETA and SE
+$METAL $script/${metalname4}.txt > ${metalname4}.out
+$METAL $script/${metalname6}.txt > ${metalname6}.out # heterogeneity analysis
+
+echo -e
+step=10
+echo "Step $step: Prepare files for LOCUS ZOOM"
+date
+
+awk -v file=${metalname4}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $imp/${finalname}_imp.bim > tmp_saige${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 AF_A1 BETA SE P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $10, $14, $15, $16, $17, "chr"$1":"$4}' tmp_saige${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $6, $7, $8, $9}' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+# FOR ASHG 2022 (no BETA, so the icons are dots and not triangles)
+awk '{print $1, $2, $3, $4, $5, $6, $9}' tmp_saige${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_saige${step}_LOCUS_ZOOM_dosage_small_final2.txt
