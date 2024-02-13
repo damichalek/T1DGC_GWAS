@@ -1,0 +1,642 @@
+#!/bin/bash
+
+echo "Filter HLA imputed data (T1DGC Humancore Exome), Apr 22, 2022, by Dominika Michalek"
+
+# Genome build: GRCh37/hg19 (no liftover)
+
+PLINK=plink1.9
+KING=king
+logfile=hla.log
+date > $logfile
+finalname=T1DGC_HCE
+releasepath=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+releasefamily=${finalname}_family-2021-01-20
+releasecc=${finalname}_cc-2021-01-20
+releaseccAFR=${finalname}_cc_AFR-2021-01-20
+releaseccAMR=${finalname}_cc_AMR-2021-01-20
+releasepcc=${finalname}_pseudo_cc-2021-01-20
+release=${finalname}-2021-01-20
+
+tmp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/Temp
+
+# four digit multi-ethnic reference panel (GRCh37/hg19)
+# These are the VCF imputed data (from Michigian imputation server)
+impAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/AFR
+impAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/AMR
+impFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Family
+impPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Pseudo_cc
+imp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/T1DGC
+
+# These are the VCF and PLINK filtered imputed data (MAF > 0.005, R2 > 0.5)
+filterAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Filtered_AFR
+filterAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Filtered_AMR
+filterFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Filtered_Family
+filterPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Filtered_Pseudo_cc
+filter=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/Filtered_T1DGC
+
+# These are the VCF and PLINK filtered imputed data (MAF > 0.005, R2 > 0.5, MI < 0.1)
+vcfAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/AFR
+vcfAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/AMR
+vcfFam=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/Family
+vcfPCC=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/Pseudo_cc
+vcf=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/T1DGC
+
+# EUR data only from Pseudo-case control (MAF > 0.005, R2 > 0.5, MI < 0.1)
+vcfEUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/Pseudo_cc/EUR
+
+
+# echo -e
+# step=0
+# echo "Step $step: Unzip imputed files (Michigan Imputation Server)"
+# date
+
+# Use password from imputation server
+# unzip -P password chr_6.zip
+
+
+echo -e
+step=1
+echo "Step $step: Summary of imputed data (four-digit multi-ethnic reference panel v2)"
+date
+
+noutAFR=$(zcat $impAFR/chr6.info.gz | awk 'NR>1' | grep "Genotyped" | wc -l)
+noutAFR2=$(zcat $impAFR/chr6.info.gz | awk 'NR>1' | grep "Imputed" | wc -l)
+echo "AFR chr6 - There are $noutAFR Genotyped SNPs and $noutAFR2 Imputed SNPs in the imputed data $impAFR"
+
+noutAMR=$(zcat $impAMR/chr6.info.gz | awk 'NR>1' | grep "Genotyped" | wc -l)
+noutAMR2=$(zcat $impAMR/chr6.info.gz | awk 'NR>1' | grep "Imputed" | wc -l)
+echo "AMR chr6 - There are $noutAMR Genotyped SNPs and $noutAMR2 Imputed SNPs in the imputed data $impAMR"
+
+noutFam=$(zcat $impFam/chr6.info.gz | awk 'NR>1' | grep "Genotyped" | wc -l)
+noutFam2=$(zcat $impFam/chr6.info.gz | awk 'NR>1' | grep "Imputed" | wc -l)
+echo "Family chr6 - There are $noutFam Genotyped SNPs and $noutFam2 Imputed SNPs in the imputed data $impFam"
+
+nout=$(zcat $imp/chr6.info.gz | awk 'NR>1' | grep "Genotyped" | wc -l)
+nout2=$(zcat $imp/chr6.info.gz | awk 'NR>1' | grep "Imputed" | wc -l)
+echo "T1DGC chr6 - There are $nout Genotyped SNPs and $nout2 Imputed SNPs in the imputed data $imp"
+
+
+echo -e
+step=3
+echo "Step $step: Tabix all datasets"
+date
+
+# AFR
+tabix -p vcf $impAFR/chr6.dose.vcf.gz
+tabix -p vcf $impAFR2/chr6.dose.vcf.gz
+
+# AMR
+tabix -p vcf $impAMR/chr6.dose.vcf.gz
+tabix -p vcf $impAMR2/chr6.dose.vcf.gz
+
+# Family
+tabix -p vcf $impFam/chr6.dose.vcf.gz
+tabix -p vcf $impFam2/chr6.dose.vcf.gz
+
+# Pseudo_cc
+tabix -p vcf $impPCC/chr6.dose.vcf.gz
+
+# T1DGC
+tabix -p vcf $imp/chr6.dose.vcf.gz
+tabix -p vcf $imp2/chr6.dose.vcf.gz
+
+
+echo -e
+step=4
+echo "Step $step: Filter AFR based on R2 > 0.5 and MAF > 0.005 (four-digit multi-ethnic reference panel v2)"
+date
+
+zcat $impAFR/chr6.info.gz | awk 'NR>1 && ($5>0.005 && $7>0.5) {print $1}' > tmp_hla${step}_AFR_chr_snp_keep_list.txt
+
+# use bcftools in order to filter based on R2 and MAF
+bcftools view --include ID==@tmp_hla${step}_AFR_chr_snp_keep_list.txt $impAFR/chr6.dose.vcf.gz -o $filterAFR/chr6.AFR.dose.filtered.vcf.gz -Oz
+
+# Convert to PLINK
+plink2 --memory 15000 --vcf $filterAFR/chr6.AFR.dose.filtered.vcf.gz --double-id --make-bed --out tmp_hla${step}_AFR_chr6_1 &>> $logfile
+
+# Update FID
+awk '{print $2,$2,$1,$2}' $releasepath/$releaseccAFR.fam > tmp_hla${step}_update_FID_AFR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AFR_chr6_1  --update-ids tmp_hla${step}_update_FID_AFR.txt --make-bed --out tmp_hla${step}_AFR_chr6_2 &>> $logfile
+
+# Extract complete families
+awk '{print $1,$2,$3,$4}' $releasepath/$releaseccAFR.fam > tmp_hla${step}_update_parents_AFR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AFR_chr6_2 --keep tmp_hla${step}_update_parents_AFR.txt --make-bed --out tmp_hla${step}_AFR_chr6_2b &>> $logfile
+
+# Update parents IDs
+$PLINK --memory 15000 --bfile tmp_hla${step}_AFR_chr6_2b --update-parents tmp_hla${step}_update_parents_AFR.txt --make-bed --out tmp_hla${step}_AFR_chr6_3 &>> $logfile
+
+# Update sex
+awk '{print $1,$2,$5}' $releasepath/$releaseccAFR.fam > tmp_hla${step}_update_sex_AFR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AFR_chr6_3 --update-sex tmp_hla${step}_update_sex_AFR.txt --make-bed --out tmp_hla${step}_AFR_chr6_4 &>> $logfile
+
+# Update T1D status
+awk '{print $1,$2,$6}' $releasepath/$releaseccAFR.fam > tmp_hla${step}_update_case_AFR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AFR_chr6_4 --pheno tmp_hla${step}_update_case_AFR.txt --make-bed --out tmp_hla${step}_AFR_chr6 &>> $logfile
+
+# Copy the final updated .fam .bed .bim files after imputation and R2 > 0.5, MAF > 0.005 filter
+if [ ! -d $filterAFR ]; then
+  mkdir $filterAFR;
+  cp $tmp/tmp_hla${step}_AFR_chr6.fam $filterAFR/AFR_chr6.fam
+  cp $tmp/tmp_hla${step}_AFR_chr6.bed $filterAFR/AFR_chr6.bed
+  cp $tmp/tmp_hla${step}_AFR_chr6.bim $filterAFR/AFR_chr6.bim
+fi
+
+
+echo -e
+step=5
+echo "Step $step: Filter AMR based on R2 > 0.5 and MAF > 0.005 (four-digit multi-ethnic reference panel v2)"
+date
+
+zcat $impAMR/chr6.info.gz | awk 'NR>1 && ($5>0.005 && $7>0.5) {print $1}' > tmp_hla${step}_AMR_chr_snp_keep_list.txt
+
+# use bcftools in order to filter based on R2 and MAF
+bcftools view --include ID==@tmp_hla${step}_AMR_chr_snp_keep_list.txt $impAMR/chr6.dose.vcf.gz -o $filterAMR/chr6.AMR.dose.filtered.vcf.gz -Oz
+
+# Convert to PLINK
+plink2 --memory 15000 --vcf $filterAMR/chr6.AMR.dose.filtered.vcf.gz --double-id --make-bed --out tmp_hla${step}_AMR_chr6_1 &>> $logfile
+
+# Update FID
+awk '{print $2,$2,$1,$2}' $releasepath/$releaseccAMR.fam > tmp_hla${step}_update_FID_AMR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AMR_chr6_1  --update-ids tmp_hla${step}_update_FID_AMR.txt --make-bed --out tmp_hla${step}_AMR_chr6_2 &>> $logfile
+
+# Extract complete families
+awk '{print $1,$2,$3,$4}' $releasepath/$releaseccAMR.fam > tmp_hla${step}_update_parents_AMR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AMR_chr6_2 --keep tmp_hla${step}_update_parents_AMR.txt --make-bed --out tmp_hla${step}_AMR_chr6_2b &>> $logfile
+
+# Update parents IDs
+$PLINK --memory 15000 --bfile tmp_hla${step}_AMR_chr6_2b --update-parents tmp_hla${step}_update_parents_AMR.txt --make-bed --out tmp_hla${step}_AMR_chr6_3 &>> $logfile
+
+# Update sex
+awk '{print $1,$2,$5}' $releasepath/$releaseccAMR.fam > tmp_hla${step}_update_sex_AMR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AMR_chr6_3 --update-sex tmp_hla${step}_update_sex_AMR.txt --make-bed --out tmp_hla${step}_AMR_chr6_4 &>> $logfile
+
+# Update T1D status
+awk '{print $1,$2,$6}' $releasepath/$releaseccAMR.fam > tmp_hla${step}_update_case_AMR.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_AMR_chr6_4 --pheno tmp_hla${step}_update_case_AMR.txt --make-bed --out tmp_hla${step}_AMR_chr6 &>> $logfile
+
+# Copy the final updated .fam .bed .bim files after imputation and R2 > 0.5, MAF > 0.005 filter
+if [ ! -d $filterAMR ]; then
+  mkdir $filterAMR;
+  cp $tmp/tmp_hla${step}_AMR_chr6.fam $filterAMR/AMR_chr6.fam
+  cp $tmp/tmp_hla${step}_AMR_chr6.bed $filterAMR/AMR_chr6.bed
+  cp $tmp/tmp_hla${step}_AMR_chr6.bim $filterAMR/AMR_chr6.bim
+fi
+
+
+echo -e
+step=6
+echo "Step $step: Filter Family based on R2 > 0.5 and MAF > 0.005 (four-digit multi-ethnic reference panel v2)"
+date
+
+zcat $impFam/chr6.info.gz | awk 'NR>1 && ($5>0.005 && $7>0.5) {print $1}' > tmp_hla${step}_fam_chr_snp_keep_list.txt
+
+# use bcftools in order to filter based on R2 and MAF
+bcftools view --include ID==@tmp_hla${step}_fam_chr_snp_keep_list.txt $impFam/chr6.dose.vcf.gz -o $filterFam/chr6.fam.dose.filtered.vcf.gz -Oz
+
+# Convert to PLINK
+plink2 --memory 15000 --vcf $filterFam/chr6.fam.dose.filtered.vcf.gz --double-id --make-bed --out tmp_hla${step}_fam_chr6_1 &>> $logfile
+
+# Update FID
+awk '{print $2,$2,$1,$2}' $releasepath/$releasefamily.fam > tmp_hla${step}_update_FID_fam.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_fam_chr6_1  --update-ids tmp_hla${step}_update_FID_fam.txt --make-bed --out tmp_hla${step}_fam_chr6_2 &>> $logfile
+# Extract complete families
+awk '{print $1,$2,$3,$4}' $releasepath/$releasefamily.fam > tmp_hla${step}_update_parents_fam.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_fam_chr6_2 --keep tmp_hla${step}_update_parents_fam.txt --make-bed --out tmp_hla${step}_fam_chr6_2b &>> $logfile
+# Update parents IDs
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_fam_chr6_2b --update-parents tmp_hla${step}_update_parents_fam.txt --make-bed --out tmp_hla${step}_fam_chr6_3 &>> $logfile
+# Update sex
+
+awk '{print $1,$2,$5}' $releasepath/$releasefamily.fam > tmp_hla${step}_update_sex_fam.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_fam_chr6_3 --update-sex tmp_hla${step}_update_sex_fam.txt --make-bed --out tmp_hla${step}_fam_chr6_4 &>> $logfile
+
+# Update T1D status
+awk '{print $1,$2,$6}' $releasepath/$releasefamily.fam > tmp_hla${step}_update_case_fam.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_fam_chr6_4 --pheno tmp_hla${step}_update_case_fam.txt --make-bed --out tmp_hla${step}_fam_chr6 &>> $logfile
+
+# Copy the final updated .fam .bed .bim files after imputation and R2 > 0.5, MAF > 0.005 filter
+
+if [ ! -d $filterFam ]; then
+  mkdir $filterFam;
+  cp $tmp/tmp_hla${step}_fam_chr6.fam $filterFam/Family_chr6.fam
+  cp $tmp/tmp_hla${step}_fam_chr6.bed $filterFam/Family_chr6.bed
+  cp $tmp/tmp_hla${step}_fam_chr6.bim $filterFam/Family_chr6.bim
+fi
+
+
+echo -e
+step=10
+echo "Step $step: Filter T1DGC based on R2 > 0.5 and MAF > 0.005 (four-digit multi-ethnic reference panel v2)"
+date
+
+zcat $imp/chr6.info.gz | awk 'NR>1 && ($5>0.005 && $7>0.5) {print $1}' > tmp_hla${step}_T1DGC_chr_snp_keep_list.txt
+
+# use bcftools in order to filter based on R2 and MAF
+bcftools view --include ID==@tmp_hla${step}_T1DGC_chr_snp_keep_list.txt $imp/chr6.dose.vcf.gz -o $filter/chr6.dose.filtered.vcf.gz -Oz
+
+# Convert to PLINK
+plink2 --memory 15000 --vcf $filter/chr6.dose.filtered.vcf.gz --double-id --make-bed --out tmp_hla${step}_T1DGC_chr6_1 &>> $logfile
+
+# Update FID
+awk '{print $2,$2,$1,$2}' $releasepath/$release.fam > tmp_hla${step}_update_FID_T1DGC.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_T1DGC_chr6_1  --update-ids tmp_hla${step}_update_FID_T1DGC.txt --make-bed --out tmp_hla${step}_T1DGC_chr6_2 &>> $logfile
+
+# Extract complete families
+awk '{print $1,$2,$3,$4}' $releasepath/$release.fam > tmp_hla${step}_update_parents_T1DGC.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_T1DGC_chr6_2 --keep tmp_hla${step}_update_parents_T1DGC.txt --make-bed --out tmp_hla${step}_T1DGC_chr6_2b &>> $logfile
+
+# Update parents IDs
+$PLINK --memory 15000 --bfile tmp_hla${step}_T1DGC_chr6_2b --update-parents tmp_hla${step}_update_parents_T1DGC.txt --make-bed --out tmp_hla${step}_T1DGC_chr6_3 &>> $logfile
+
+# Update sex
+awk '{print $1,$2,$5}' $releasepath/$release.fam > tmp_hla${step}_update_sex_T1DGC.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_T1DGC_chr6_3 --update-sex tmp_hla${step}_update_sex_T1DGC.txt --make-bed --out tmp_hla${step}_T1DGC_chr6_4 &>> $logfile
+
+# Update T1D status
+awk '{print $1,$2,$6}' $releasepath/$release.fam > tmp_hla${step}_update_case_T1DGC.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_T1DGC_chr6_4 --pheno tmp_hla${step}_update_case_T1DGC.txt --make-bed --out tmp_hla${step}_T1DGC_chr6 &>> $logfile
+
+# Copy the final updated .fam .bed .bim files after imputation and R2 > 0.5, MAF > 0.005 filter
+if [ ! -d $filter ]; then
+  mkdir $filter;
+  cp $tmp/tmp_hla${step}_T1DGC_chr6.fam $filter/T1DGC_chr6.fam
+  cp $tmp/tmp_hla${step}_T1DGC_chr6.bed $filter/T1DGC_chr6.bed
+  cp $tmp/tmp_hla${step}_T1DGC_chr6.bim $filter/T1DGC_chr6.bim
+fi
+
+
+echo -e
+step=12
+echo "Step $step: Filter Pseudo-case control based on R2 > 0.5 and MAF > 0.005 (four-digit multi-ethnic reference panel v2)"
+date
+
+zcat $impPCC/chr6.info.gz | awk 'NR>1 && ($5>0.005 && $7>0.5) {print $1}' > tmp_hla${step}_pseudo_cc_chr_snp_keep_list.txt
+
+# use bcftools in order to filter based on R2 and MAF
+bcftools view --include ID==@tmp_hla${step}_pseudo_cc_chr_snp_keep_list.txt $impPCC/chr6.dose.vcf.gz -o $filterPCC/chr6.pseudo_cc.dose.filtered.vcf.gz -Oz
+
+# Convert to PLINK
+plink2 --memory 15000 --vcf $filterPCC/chr6.pseudo_cc.dose.filtered.vcf.gz --double-id --make-bed --out tmp_hla${step}_pseudo_cc_chr6_1 &>> $logfile
+
+# Update FID
+awk '{print $2,$2,$1,$2}' $releasepath/$releasepcc.fam > tmp_hla${step}_update_FID_pseudo_cc.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_pseudo_cc_chr6_1  --update-ids tmp_hla${step}_update_FID_pseudo_cc.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6_2 &>> $logfile
+
+# Extract complete families
+awk '{print $1,$2,$3,$4}' $releasepath/$releasepcc.fam > tmp_hla${step}_update_parents_pseudo_cc.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_pseudo_cc_chr6_2 --keep tmp_hla${step}_update_parents_pseudo_cc.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6_2b &>> $logfile
+
+# Update parents IDs
+$PLINK --memory 15000 --bfile tmp_hla${step}_pseudo_cc_chr6_2b --update-parents tmp_hla${step}_update_parents_pseudo_cc.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6_3 &>> $logfile
+
+# Update sex
+awk '{print $1,$2,$5}' $releasepath/$releasepcc.fam > tmp_hla${step}_update_sex_pseudo_cc.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_pseudo_cc_chr6_3 --update-sex tmp_hla${step}_update_sex_pseudo_cc.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6_4 &>> $logfile
+
+# Update T1D status
+awk '{print $1,$2,$6}' $releasepath/$releasepcc.fam > tmp_hla${step}_update_case_pseudo_cc.txt
+
+$PLINK --memory 15000 --bfile tmp_hla${step}_pseudo_cc_chr6_4 --pheno tmp_hla${step}_update_case_pseudo_cc.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6 &>> $logfile
+
+# Copy the final updated .fam .bed .bim files after imputation and R2 > 0.5, MAF > 0.005 filter
+if [ ! -d $filterPCC ]; then
+  mkdir $filterPCC;
+  cp $tmp/tmp_hla${step}_pseudo_cc_chr6.fam $filterPCC/Pseudo_cc_chr6.fam
+  cp $tmp/tmp_hla${step}_pseudo_cc_chr6.bed $filterPCC/Pseudo_cc_chr6.bed
+  cp $tmp/tmp_hla${step}_pseudo_cc_chr6.bim $filterPCC/Pseudo_cc_chr6.bim
+fi
+
+
+echo -e
+step=13
+echo "Step $step: Check MI errors (imputed data, MAF > 0.005, R2 > 0.5)"
+date
+
+# Check MI error
+$KING -b $filterFam/Family_chr6.bed --bySNP --prefix tmp_hla${step}_fam_chr6_ &>> $logfile
+awk '{print $1, $2, $3, $4, $5, $6, $21}' tmp_hla${step}_fam_chr6_bySNP.txt | sed "s/ /\t/g" > tmp_hla${step}_fam_chr6_bySNP_final_short.txt
+
+
+echo -e
+step=14
+step13=$((step-1))
+echo "Step $step: Extract SNPs with MI < 0.1 and MI < 0.01 (imputed data, MAF > 0.005, R2 > 0.5)"
+date
+
+# MI < 0.1
+awk 'NR==1' tmp_hla${step13}_fam_chr6_bySNP_final_short.txt > tmp_hla${step}_fam_0.1.txt
+awk '$NF <0.1 {print $0}' tmp_hla${step13}_fam_chr6_bySNP_final_short.txt | sed "s/ /\t/g" >> tmp_hla${step}_fam_0.1.txt
+
+awk 'NR>1' tmp_hla${step}_fam_0.1.txt | awk '{print $0}' | sed "s/ /\t/g" > tmp_hla${step}_fam_0.1_edit.txt
+
+nout=$(cat tmp_hla${step}_fam_0.1_edit.txt | wc -l)
+echo "There are $nout SNPs with MIerror < 0.1"
+
+# SNPs to be removed (MI > 0.1)
+awk '$NF >=0.1 {print $0}' tmp_hla${step13}_fam_chr6_bySNP_final_short.txt | sed "s/ /\t/g" > tmp_hla${step}_fam_0.1_tbr.txt
+
+# MI < 0.01
+awk 'NR==1' tmp_hla${step13}_fam_chr6_bySNP_final_short.txt > tmp_hla${step}_fam_0.01.txt
+awk '$NF <0.01 {print $0}' tmp_hla${step13}_fam_chr6_bySNP_final_short.txt | sed "s/ /\t/g" >> tmp_hla${step}_fam_0.01.txt
+
+awk 'NR>1' tmp_hla${step}_fam_0.01.txt | awk '{print $0}' | sed "s/ /\t/g" > tmp_hla${step}_fam_0.01_edit.txt
+
+nout2=$(cat tmp_hla${step}_fam_0.01_edit.txt | wc -l)
+echo "There are $nout2 SNPs with MIerror < 0.01"
+
+# SNPs to be removed (MI > 0.01)
+awk '$NF >=0.01 {print $0}' tmp_hla${step13}_fam_chr6_bySNP_final_short.txt | sed "s/ /\t/g" > tmp_hla${step}_fam_0.01_tbr.txt
+
+
+echo -e
+step=15
+step14=$((step-1))
+echo "Step $step: Update SNPs in AFR, AMR, fam, pseudo_cc and T1DGC_HCE files based on MI < 0.1 (imputed data, MAF > 0.005, R2 > 0.5)"
+date
+
+# These files contain only SNPs with MI < 0.1 (MAF > 0.005, R2 > 0.5)
+$PLINK --bfile $filterAFR/AFR_chr6 --exclude tmp_hla${step14}_fam_0.1_tbr.txt --make-bed --out tmp_hla${step}_AFR_chr6 &>> $logfile
+$PLINK --bfile $filterAMR/AMR_chr6 --exclude tmp_hla${step14}_fam_0.1_tbr.txt --make-bed --out tmp_hla${step}_AMR_chr6 &>> $logfile
+$PLINK --bfile $filterFam/Family_chr6 --exclude tmp_hla${step14}_fam_0.1_tbr.txt --make-bed --out tmp_hla${step}_fam_chr6 &>> $logfile
+$PLINK --bfile $filterPCC/Pseudo_cc_chr6 --exclude tmp_hla${step14}_fam_0.1_tbr.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6 &>> $logfile
+$PLINK --bfile $filter/T1DGC_chr6 --exclude tmp_hla${step14}_fam_0.1_tbr.txt --make-bed --out tmp_hla${step}_${finalname}_chr6 &>> $logfile
+
+# We decided on MI < 0.1 treshold (FINAL plink files)
+cp tmp_hla${step}_AFR_chr6.fam $vcfAFR/T1DGC_HCE_imp_AFR_chr6.fam
+cp tmp_hla${step}_AFR_chr6.bed $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bed
+cp tmp_hla${step}_AFR_chr6.bim $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bim
+
+cp tmp_hla${step}_AMR_chr6.fam $vcfAMR/T1DGC_HCE_imp_AMR_chr6.fam
+cp tmp_hla${step}_AMR_chr6.bed $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bed
+cp tmp_hla${step}_AMR_chr6.bim $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bim
+
+cp tmp_hla${step}_fam_chr6.fam $vcfFam/T1DGC_HCE_imp_fam_chr6.fam
+cp tmp_hla${step}_fam_chr6.bed $vcfFam/T1DGC_HCE_imp_fam_chr6.bed
+cp tmp_hla${step}_fam_chr6.bim $vcfFam/T1DGC_HCE_imp_fam_chr6.bim
+
+cp tmp_hla${step}_pseudo_cc_chr6.fam $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.fam
+cp tmp_hla${step}_pseudo_cc_chr6.bed $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.bed
+cp tmp_hla${step}_pseudo_cc_chr6.bim $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.bim
+
+cp tmp_hla${step}_${finalname}_chr6.fam $vcf/T1DGC_HCE_imp_chr6.fam
+cp tmp_hla${step}_${finalname}_chr6.bed $vcf/T1DGC_HCE_imp_chr6.bed
+cp tmp_hla${step}_${finalname}_chr6.bim $vcf/T1DGC_HCE_imp_chr6.bim
+
+
+echo -e
+step=16
+step14=$((step-2))
+echo "Step $step: Update SNPs in AFR, AMR, fam and T1DGC_HCE files based on MI < 0.01 (imputed data, MAF > 0.005, R2 > 0.5)"
+date
+
+# These files contain only SNPs with MI < 0.01 (MAF > 0.005, R2 > 0.5)
+$PLINK --bfile $filterAFR/AFR_chr6 --exclude tmp_hla${step14}_fam_0.01_tbr.txt --make-bed --out tmp_hla${step}_AFR_chr6 &>> $logfile
+$PLINK --bfile $filterAMR/AMR_chr6 --exclude tmp_hla${step14}_fam_0.01_tbr.txt --make-bed --out tmp_hla${step}_AMR_chr6 &>> $logfile
+$PLINK --bfile $filterFam/Family_chr6 --exclude tmp_hla${step14}_fam_0.01_tbr.txt --make-bed --out tmp_hla${step}_fam_chr6 &>> $logfile
+$PLINK --bfile $filterPCC/Pseudo_cc_chr6 --exclude tmp_hla${step14}_fam_0.01_tbr.txt --make-bed --out tmp_hla${step}_pseudo_cc_chr6 &>> $logfile
+$PLINK --bfile $filter/T1DGC_chr6 --exclude tmp_hla${step14}_fam_0.01_tbr.txt --make-bed --out tmp_hla${step}_${finalname}_chr6 &>> $logfile
+
+
+echo -e
+step=17
+echo "Step $step: Update SNPs in AFR, AMR, Family, Pseudo-case control, T1DGC files based on MI < 0.1 (imputed data, MAF > 0.005, R2 > 0.5) - VCF files"
+date
+
+# AFR
+awk '{print $2}' $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bim > tmp_hla${step}_AFR_chr6_snp_keep_list.txt
+
+# AFR - filters variants based on MI < 0.1 threshold
+bcftools view --include ID==@tmp_hla${step}_AFR_chr6_snp_keep_list.txt $filterAFR/chr6.AFR.dose.filtered.vcf.gz -o $vcfAFR/T1DGC_HCE_imp_AFR_chr6.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfAFR/T1DGC_HCE_imp_AFR_chr6.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfAFR/T1DGC_HCE_imp_AFR_chr6.vcf.gz
+
+# AMR
+awk '{print $2}' $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bim > tmp_hla${step}_AMR_chr6_snp_keep_list.txt
+
+# AMR - filters variants based on MI < 0.1 threshold
+bcftools view --include ID==@tmp_hla${step}_AMR_chr6_snp_keep_list.txt $filterAMR/chr6.AMR.dose.filtered.vcf.gz -o $vcfAMR/T1DGC_HCE_imp_AMR_chr6.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfAMR/T1DGC_HCE_imp_AMR_chr6.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfAMR/T1DGC_HCE_imp_AMR_chr6.vcf.gz
+
+
+# Family
+awk '{print $2}' $vcfFam/T1DGC_HCE_imp_fam_chr6.bim > tmp_hla${step}_fam_chr6_snp_keep_list.txt
+
+# Family - filters variants based on MI < 0.1 threshold
+bcftools view --include ID==@tmp_hla${step}_fam_chr6_snp_keep_list.txt $filterFam/chr6.fam.dose.filtered.vcf.gz -o $vcfFam/T1DGC_HCE_imp_fam_chr6.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfFam/T1DGC_HCE_imp_fam_chr6.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfFam/T1DGC_HCE_imp_fam_chr6.vcf.gz
+
+# Pseudo-case control
+awk '{print $2}' $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.bim > tmp_hla${step}_pseudo_cc_chr6_snp_keep_list.txt
+
+# Pseudo-case control - filters variants based on MI < 0.1 threshold
+bcftools view --include ID==@tmp_hla${step}_pseudo_cc_chr6_snp_keep_list.txt $filterPCC/chr6.pseudo_cc.dose.filtered.vcf.gz -o $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.vcf.gz
+
+
+# T1DGC
+awk '{print $2}' $vcf/T1DGC_HCE_imp_chr6.bim > tmp_hla${step}_chr6_snp_keep_list.txt
+
+# T1DGC - filters variants based on MI < 0.1 threshold
+bcftools view --include ID==@tmp_hla${step}_chr6_snp_keep_list.txt $filter/chr6.dose.filtered.vcf.gz -o $vcf/T1DGC_HCE_imp_chr6.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcf/T1DGC_HCE_imp_chr6.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcf/T1DGC_HCE_imp_chr6.vcf.gz
+
+
+echo -e
+step=18
+echo "Step $step: Prepare EUR only samples from Pseudo-case control dataset (imputed data, MAF > 0.005, R2 > 0.5, MI < 0.1) - VCF and PLINK files"
+date
+
+awk 'NR>1' $releasepath/T1DGC_HCE_InferredAncestry_family.txt | awk '{print $1, $2"_T", $9}' | sed "s/ /\t/g" > tmp_hla${step}_fam_anc.txt
+awk 'NR>1' $releasepath/T1DGC_HCE_InferredAncestry_family.txt | awk '{print $1, $2"_U", $9}' | sed "s/ /\t/g" >> tmp_hla${step}_fam_anc.txt
+
+awk -v file=tmp_hla${step}_fam_anc.txt 'BEGIN{while((getline<file)>0)l[$2]=$0}$2 in l{print $0"\t"l[$2]}' $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.fam | sed "s/ /\t/g" > tmp_hla${step}_anc.txt
+
+awk '{print $1, $2, $9}' tmp_hla${step}_anc.txt | sed "s/ /\t/g" > tmp_hla${step}_pcc_anc.txt
+
+# Take EUR from pseudo-case control
+awk '{if($3=="EUR"){print $1, $2}}' tmp_hla${step}_pcc_anc.txt | sed "s/ /\t/g" > tmp_hla${step}_pcc_EUR.txt
+awk '{if($3=="EUR"){print $2}}' tmp_hla${step}_pcc_anc.txt | sed "s/ /\t/g" > tmp_hla${step}_pcc_EUR_IDs.txt
+
+# EUR PLINK files
+$PLINK --bfile $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6 --keep tmp_hla${step}_pcc_EUR.txt --make-bed --out $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6 &>> $logfile
+
+# EUR VCF files
+bcftools view --samples-file tmp_hla${step}_pcc_EUR_IDs.txt $vcfPCC/T1DGC_HCE_imp_pseudo_cc_chr6.vcf.gz -o $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.vcf.gz
+
+
+echo -e
+step=19
+echo "Step $step: Separate SNPs, amino-acids and HLA genes in AFR (four-digit multi-ethnic reference panel v2) (imputed data, MAF > 0.005, R2 > 0.5, MI < 0.1) - VCF and PLINK files"
+date
+
+# HLA genes
+awk '$2 ~ /HLA/ {print $2}' $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bim > tmp_hla${step}_AFR_chr6_HLA.txt
+
+# Amino-acids (AA)
+awk '$2 ~ /AA/ {print $2}' $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bim > tmp_hla${step}_AFR_chr6_AA.txt
+
+# SNPs
+awk '$2 ~ /rs/ {print $2}' $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bim > tmp_hla${step}_AFR_chr6_SNPs.txt
+awk '$2 ~ /SNPS/ {print $2}' $vcfAFR/T1DGC_HCE_imp_AFR_chr6.bim >> tmp_hla${step}_AFR_chr6_SNPs.txt
+
+# PLINK (HLA, AA, SNPs)
+$PLINK --bfile $vcfAFR/T1DGC_HCE_imp_AFR_chr6 --extract tmp_hla${step}_AFR_chr6_HLA.txt --make-bed --out $vcfAFR/T1DGC_HCE_imp_AFR_chr6_HLA &>> $logfile
+$PLINK --bfile $vcfAFR/T1DGC_HCE_imp_AFR_chr6 --extract tmp_hla${step}_AFR_chr6_AA.txt --make-bed --out $vcfAFR/T1DGC_HCE_imp_AFR_chr6_AA &>> $logfile
+$PLINK --bfile $vcfAFR/T1DGC_HCE_imp_AFR_chr6 --extract tmp_hla${step}_AFR_chr6_SNPs.txt --make-bed --out $vcfAFR/T1DGC_HCE_imp_AFR_chr6_SNPs &>> $logfile
+
+# AFR - filters variants (HLA)
+bcftools view --include ID==@tmp_hla${step}_AFR_chr6_HLA.txt $vcfAFR/T1DGC_HCE_imp_AFR_chr6.vcf.gz -o $vcfAFR/T1DGC_HCE_imp_AFR_chr6_HLA.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfAFR/T1DGC_HCE_imp_AFR_chr6_HLA.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfAFR/T1DGC_HCE_imp_AFR_chr6_HLA.vcf.gz
+
+# AFR - filters variants (AA)
+bcftools view --include ID==@tmp_hla${step}_AFR_chr6_AA.txt $vcfAFR/T1DGC_HCE_imp_AFR_chr6.vcf.gz -o $vcfAFR/T1DGC_HCE_imp_AFR_chr6_AA.vcf.gz -Oz
+tabix -p vcf $vcfAFR/T1DGC_HCE_imp_AFR_chr6_AA.vcf.gz
+bcftools index -c $vcfAFR/T1DGC_HCE_imp_AFR_chr6_AA.vcf.gz
+
+# AFR - filters variants (SNPs)
+bcftools view --include ID==@tmp_hla${step}_AFR_chr6_SNPs.txt $vcfAFR/T1DGC_HCE_imp_AFR_chr6.vcf.gz -o $vcfAFR/T1DGC_HCE_imp_AFR_chr6_SNPs.vcf.gz -Oz
+tabix -p vcf $vcfAFR/T1DGC_HCE_imp_AFR_chr6_SNPs.vcf.gz
+bcftools index -c $vcfAFR/T1DGC_HCE_imp_AFR_chr6_SNPs.vcf.gz
+
+
+echo -e
+step=20
+echo "Step $step: Separate SNPs, amino-acids and HLA genes in AMR (four-digit multi-ethnic reference panel v2) (imputed data, MAF > 0.005, R2 > 0.5, MI < 0.1) - VCF and PLINK files"
+date
+
+# HLA genes
+awk '$2 ~ /HLA/ {print $2}' $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bim > tmp_hla${step}_AMR_chr6_HLA.txt
+
+# Amino-acids (AA)
+awk '$2 ~ /AA/ {print $2}' $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bim > tmp_hla${step}_AMR_chr6_AA.txt
+
+# SNPs
+awk '$2 ~ /rs/ {print $2}' $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bim > tmp_hla${step}_AMR_chr6_SNPs.txt
+awk '$2 ~ /SNPS/ {print $2}' $vcfAMR/T1DGC_HCE_imp_AMR_chr6.bim >> tmp_hla${step}_AMR_chr6_SNPs.txt
+
+# PLINK (HLA, AA, SNPs)
+$PLINK --bfile $vcfAMR/T1DGC_HCE_imp_AMR_chr6 --extract tmp_hla${step}_AMR_chr6_HLA.txt --make-bed --out $vcfAMR/T1DGC_HCE_imp_AMR_chr6_HLA &>> $logfile
+$PLINK --bfile $vcfAMR/T1DGC_HCE_imp_AMR_chr6 --extract tmp_hla${step}_AMR_chr6_AA.txt --make-bed --out $vcfAMR/T1DGC_HCE_imp_AMR_chr6_AA &>> $logfile
+$PLINK --bfile $vcfAMR/T1DGC_HCE_imp_AMR_chr6 --extract tmp_hla${step}_AMR_chr6_SNPs.txt --make-bed --out $vcfAMR/T1DGC_HCE_imp_AMR_chr6_SNPs &>> $logfile
+
+# AMR - filters variants (HLA)
+bcftools view --include ID==@tmp_hla${step}_AMR_chr6_HLA.txt $vcfAMR/T1DGC_HCE_imp_AMR_chr6.vcf.gz -o $vcfAMR/T1DGC_HCE_imp_AMR_chr6_HLA.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfAMR/T1DGC_HCE_imp_AMR_chr6_HLA.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfAMR/T1DGC_HCE_imp_AMR_chr6_HLA.vcf.gz
+
+# AMR - filters variants (AA)
+bcftools view --include ID==@tmp_hla${step}_AMR_chr6_AA.txt $vcfAMR/T1DGC_HCE_imp_AMR_chr6.vcf.gz -o $vcfAMR/T1DGC_HCE_imp_AMR_chr6_AA.vcf.gz -Oz
+tabix -p vcf $vcfAMR/T1DGC_HCE_imp_AMR_chr6_AA.vcf.gz
+bcftools index -c $vcfAMR/T1DGC_HCE_imp_AMR_chr6_AA.vcf.gz
+
+# AMR - filters variants (SNPs)
+bcftools view --include ID==@tmp_hla${step}_AMR_chr6_SNPs.txt $vcfAMR/T1DGC_HCE_imp_AMR_chr6.vcf.gz -o $vcfAMR/T1DGC_HCE_imp_AMR_chr6_SNPs.vcf.gz -Oz
+tabix -p vcf $vcfAMR/T1DGC_HCE_imp_AMR_chr6_SNPs.vcf.gz
+bcftools index -c $vcfAMR/T1DGC_HCE_imp_AMR_chr6_SNPs.vcf.gz
+
+
+echo -e
+step=21
+echo "Step $step: Separate SNPs, amino-acids and HLA genes in EUR (four-digit multi-ethnic reference panel v2) (imputed data, MAF > 0.005, R2 > 0.5, MI < 0.1) - VCF and PLINK files"
+date
+
+# HLA genes
+awk '$2 ~ /HLA/ {print $2}' $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.bim > tmp_hla${step}_EUR_chr6_HLA.txt
+
+# Amino-acids (AA)
+awk '$2 ~ /AA/ {print $2}' $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.bim > tmp_hla${step}_EUR_chr6_AA.txt
+
+# SNPs
+awk '$2 ~ /rs/ {print $2}' $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.bim > tmp_hla${step}_EUR_chr6_SNPs.txt
+awk '$2 ~ /SNPS/ {print $2}' $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.bim >> tmp_hla${step}_EUR_chr6_SNPs.txt
+
+# PLINK (HLA, AA, SNPs)
+$PLINK --bfile $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6 --extract tmp_hla${step}_EUR_chr6_HLA.txt --make-bed --out $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_HLA &>> $logfile
+$PLINK --bfile $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6 --extract tmp_hla${step}_EUR_chr6_AA.txt --make-bed --out $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_AA &>> $logfile
+$PLINK --bfile $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6 --extract tmp_hla${step}_EUR_chr6_SNPs.txt --make-bed --out $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_SNPs &>> $logfile
+
+# EUR - filters variants (HLA)
+bcftools view --include ID==@tmp_hla${step}_EUR_chr6_HLA.txt $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.vcf.gz -o $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_HLA.vcf.gz -Oz
+
+# tabix – Generic indexer for TAB-delimited genome position files
+# -p, --preset STR -> Input format for indexing. Valid values are: gff, bed, sam, vcf.
+tabix -p vcf $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_HLA.vcf.gz
+
+# I will use also bcftools, in order to have .csi files
+bcftools index -c $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_HLA.vcf.gz
+
+# EUR - filters variants (AA)
+bcftools view --include ID==@tmp_hla${step}_EUR_chr6_AA.txt $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.vcf.gz -o $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_AA.vcf.gz -Oz
+tabix -p vcf $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_AA.vcf.gz
+bcftools index -c $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_AA.vcf.gz
+
+# EUR - filters variants (SNPs)
+bcftools view --include ID==@tmp_hla${step}_EUR_chr6_SNPs.txt $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.vcf.gz -o $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_SNPs.vcf.gz -Oz
+tabix -p vcf $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_SNPs.vcf.gz
+bcftools index -c $vcfEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6_SNPs.vcf.gz
