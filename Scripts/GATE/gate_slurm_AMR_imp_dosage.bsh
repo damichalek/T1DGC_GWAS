@@ -1,0 +1,58 @@
+#!/bin/bash
+
+echo "Prepare scripts for slurm jobs (GATE AMR imputed data MAF > 0.01, R2 > 0.3 and MAF < 0.01, R2 > 0.5, MI < 0.1 - step2), Jul 26, 2022, by Dominika Michalek"
+
+# imputed data
+# RIVANNA
+
+log=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/GATE_imputed_data-2022-07-21/fullGRM/output/submission
+vcf=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Imputed_data_release-2022-03-04/VCF/AMR
+input=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/GATE_imputed_data-2022-07-21/fullGRM/input/AMR
+output=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/GATE_imputed_data-2022-07-21/fullGRM/output/AMR
+hostname=rivanna.hpc.virginia.edu
+
+echo -e
+
+for i in {1..22}; do
+  script=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/GATE_imputed_data-2022-07-21/fullGRM/Script/AMR/gate_HCE_AMR_age_chr${i}_step2_imp_dosage_survival.slurm
+
+  echo -e "#!/bin/bash \n" > $script
+
+  echo "#SBATCH --job-name='gate_HCE_AMR_age_chr${i}_step2_dosage_survival'" >> $script
+  echo "#SBATCH --output='$log/gate_HCE_AMR_age_chr${i}_step2_dosage_survival.log'" >> $script
+  echo "#SBATCH --mem='16000'" >> $script
+  echo "#SBATCH --cpus-per-task='8'" >> $script
+  echo "#SBATCH --time='01-24:00:00'" >> $script
+  echo "#SBATCH --partition='standard'" >> $script
+  echo "#SBATCH -m block" >> $script
+  echo "#SBATCH --ntasks=1" >> $script
+  echo -e "#SBATCH --account rich_immunochip_paid \n" >> $script
+
+  echo "# Doesn't work as it should. Shows information, when the script was made, not when the script was run." >> $script
+  echo "echo 'Compute node:' '$hostname'" >> $script
+  echo -e "echo 'Start time:' '`date +'%Y-%m-%d %T'`' \n" >> $script
+
+  echo -e "module load singularity \n">> $script
+
+  echo "### Single variant association tests" >> $script
+  echo "## Step 2: performing single-variant association tests" >> $script
+  echo -e "# VCF containing dosages (--vcfField=DS) \n" >> $script
+
+  echo -e "# CHR ${i} \n" >> $script
+
+  echo  "singularity exec gate3.sif step2_SPAtests.R \\" >> $script
+  echo "--vcfFile=$vcf/T1DGC_HCE_imp_AMR_chr${i}.vcf.gz \\" >> $script
+  echo "--vcfFileIndex=$vcf/T1DGC_HCE_imp_AMR_chr${i}.vcf.gz.csi \\" >> $script
+  echo "--vcfField=DS \\" >> $script
+  echo "--chrom=chr${i} \\" >> $script
+  echo "--minMAF=0.01 \\" >> $script
+  echo "--minMAC=20 \\" >> $script
+  echo "--sampleFile=$input/sampleID_AMR.txt \\" >> $script
+  echo "--GMMATmodelFile=$output/HCE_AMR_survival.rda \\" >> $script
+  echo "--varianceRatioFile=$output/HCE_AMR_survival.varianceRatio.txt \\" >> $script
+  echo "--SAIGEOutputFile=$output/HCE_AMR_age_chr${i}.GATE.vcf.dosage.txt \\" >> $script
+  echo "--numLinesOutput=2 \\" >> $script
+  echo -e "--IsOutputAFinCaseCtrl=TRUE \n" >> $script
+
+  echo "exit" >> $script
+done
