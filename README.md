@@ -58,6 +58,12 @@ bash HLA/imp_hla.bsh
 bash SAIGE/input_saige.bsh
 
 # run SAIGE
+# step 1
+sbatch SAIGE/saige_HCE_AFR_step1.slurm
+sbatch SAIGE/saige_HCE_AMR_step1.slurm
+sbatch SAIGE/saige_HCE_pcc_step1.slurm
+
+# step2
 bash SAIGE/saige_slurm_AFR_imp_dosage.bsh
 bash SAIGE/saige_slurm_AMR_imp_dosage.bsh
 bash SAIGE/saige_slurm_pcc_imp_dosage.bsh
@@ -69,6 +75,12 @@ bash SAIGE/saige_slurm_pcc_imp_dosage.bsh
 bash GATE/input_gate.bsh
 
 # run GATE
+# step 1
+sbatch GATE/gate_HCE_AFR_step1.slurm
+sbatch GATE/gate_HCE_AMR_step1.slurm
+sbatch GATE/gate_HCE_pcc_step1.slurm
+
+# step 2
 bash GATE/gate_slurm_AFR_imp_dosage.bsh
 bash GATE/gate_slurm_AMR_imp_dosage.bsh
 bash GATE/gate_slurm_pcc_imp_dosage.bsh
@@ -81,11 +93,19 @@ bash SAIGE/saige_fullGRM.bsh
 bash GATE/gate_fullGRM.bsh
 ```
 
-4. HLA association analyses in SAIGE and GATE
+4. HLA association analysis in SAIGE
+```bash
+# prepare SAIGE input files
+bash HLA/SAIGE/input_saige_hla.bsh
+
+# run SAIGE
+```
+
+5. HLA association analysis in GATE
 ```bash
 ```
 
-5. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
+6. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
 ```bash
 ```
 
