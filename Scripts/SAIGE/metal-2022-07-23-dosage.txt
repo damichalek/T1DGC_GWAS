@@ -1,0 +1,29 @@
+# Meta-analysis for imputed T1DGC Humancore Exome data and processed with SAIGE - dosage, Jul 23, 2022, by Dominika Michalek
+
+# Execute an effect size and standard error based analysis 
+# SCHEME STDERR
+
+# Describe and process the tmp_saige1_AFR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele1 Allele2
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_saige1_AFR_dosage_final.txt
+
+# Describe and process the tmp_saige1_AMR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele1 Allele2
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_saige1_AMR_dosage_final.txt
+
+OUTFILE metal-2022-07-23-dosage .TBL
+
+# Execute meta-analysis
+ANALYZE
