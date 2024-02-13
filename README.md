@@ -69,7 +69,7 @@ bash GATE/gate_slurm_AMR_imp_dosage.bsh
 bash GATE/gate_slurm_pcc_imp_dosage.bsh
 ```
 
-3. Meta-analysis in METAL for both T1D risk and age at onset
+3. Meta-analysis in METAL for both T1D risk (SAIGE) and age at onset (GATE)
 ```bash
 # uses metal scripts
 bash SAIGE/saige_fullGRM.bsh
