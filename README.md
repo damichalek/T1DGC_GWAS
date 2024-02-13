@@ -26,7 +26,7 @@ bash pseudo_cc.bsh
 bash pca.bsh
 ```
 
-## Imputation
+## Imputation to TOPMed Reference panel and HLA-TAPAS
 1. Prepare data for imputation
 ```bash
 # uses Rayner perl script (HRC-1000G-check-bim-NoReadKey.pl)
@@ -61,7 +61,7 @@ bash SAIGE/saige_slurm_pcc_imp_dosage.bsh
 2. Frailty mixed model regression in GATE for each ancestry group (AFR, AMR, EUR)
 ```bash
 # prepare GATE input files
-bash GATE/input_saige.bsh
+bash GATE/input_gate.bsh
 
 # run GATE
 bash GATE/gate_slurm_AFR_imp_dosage.bsh
