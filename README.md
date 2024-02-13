@@ -35,7 +35,7 @@ bash pre_imputation.bsh
 
 2. Impute data to [TOPMed reference panel](https://imputation.biodatacatalyst.nhlbi.nih.gov/#!) (1.5.7 and 1.6.6) and [HLA-TAPAS](https://imputationserver.sph.umich.edu/index.html#!) (1.5.8)
 
-3. Download, unzip and filter imputation results
+3. Download, unzip and filter imputation results (TOPMed)
 ```bash
 bash imp_filter.bsh
 
@@ -44,6 +44,11 @@ bash imp_mi.bsh
 
 # filter imputed VCF files with MI < 0.1
 bash imp_vcf.bsh
+```
+
+4. Download, unzip and filter imputation results (HLA-TAPAS)
+```bash
+bash HLA/imp_hla.bsh
 ```
 
 ## Association analyses
@@ -75,9 +80,15 @@ bash GATE/gate_slurm_pcc_imp_dosage.bsh
 bash SAIGE/saige_fullGRM.bsh
 bash GATE/gate_fullGRM.bsh
 ```
+
 4. HLA association analyses in SAIGE and GATE
+```bash
+```
+
 5. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
+```bash
+```
 
 ## FUMA
-1. SNP2GENE module
-2. GENE2FUNCTION module
+1. Run SNP2GENE module
+2. Run GENE2FUNCTION module
