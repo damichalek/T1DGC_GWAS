@@ -1,0 +1,34 @@
+# Meta-analysis for imputed T1DGC Humancore Exome data and processed with GATE - dosage, Sep 13, 2022, by Dominika Michalek
+
+# Execute an effect size and standard error based analysis 
+SCHEME STDERR
+
+# To help identify allele flips, it can be useful to track
+# allele frequencies in the meta-analysis
+AVERAGEFREQ ON
+MINMAXFREQ ON
+
+# Describe and process the tmp_gate1_AFR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+ALLELE Allele2 Allele1
+FREQ AF_Allele2
+EFFECT BETA
+STDERR SE
+
+PROCESS tmp_gate1_AFR_dosage_final.txt
+
+# Describe and process the tmp_gate1_AMR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+ALLELE Allele2 Allele1
+FREQ AF_Allele2
+EFFECT BETA
+STDERR SE
+
+PROCESS tmp_gate1_AMR_dosage_final.txt
+
+OUTFILE metal-2022-09-13-dosage .TBL
+
+# Execute meta-analysis
+ANALYZE

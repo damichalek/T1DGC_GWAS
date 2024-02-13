@@ -1,0 +1,39 @@
+# Meta-analysis for imputed T1DGC Humancore Exome data and processed with GATE - dosage, Jul 27, 2022, by Dominika Michalek
+
+# Execute an effect size and standard error based analysis 
+# SCHEME STDERR
+
+# Describe and process the tmp_gate1_AFR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele1 Allele2
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_gate1_AFR_dosage_final.txt
+
+# Describe and process the tmp_gate1_AMR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele1 Allele2
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_gate1_AMR_dosage_final.txt
+
+# Describe and process tmp_gate1_pseudo_cc_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele1 Allele2
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_gate1_pseudo_cc_dosage_final.txt
+
+OUTFILE metal-2022-07-27-dosage .TBL
+
+# Execute meta-analysis
+ANALYZE
