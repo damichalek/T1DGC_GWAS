@@ -112,6 +112,19 @@ sbatch HLA/SAIGE/saige_HCE_pcc_EUR_chr6_step2.slurm
 
 5. HLA association analysis in GATE
 ```bash
+# prepare GATE input files
+bash HLA/GATE/input_gate_hla.bsh
+
+# run GATE
+# step 1
+sbatch HLA/GATE/gate_HCE_AFR_step1.slurm
+sbatch HLA/GATE/gate_HCE_AMR_step1.slurm
+sbatch HLA/GATE/gate_HCE_pcc_EUR_step1.slurm
+
+# step2
+sbatch HLA/GATE/gate_HCE_AFR_chr6_step2.slurm
+sbatch HLA/GATE/gate_HCE_AMR_chr6_step2.slurm
+sbatch HLA/GATE/gate_HCE_pcc_EUR_chr6_step2.slurm
 ```
 
 6. HLA meta-analysis in METAL for both T1D risk (SAIGE) and age at onset (GATE)
