@@ -1,0 +1,123 @@
+#!/bin/bash
+
+echo "Input files for SAIGE analysis of HLA imputed region of T1DGC Humancore Exome data, Oct 18, 2022, by Dominika Michalek"
+
+# age of cases and controls up to 32
+
+pc=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20/PCs_plink
+
+input_EUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/input/EUR
+input_AFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/input/AFR
+input_AMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/input/AMR
+
+release=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+
+### Survival analysis (GATE)
+### AMR
+## STEP 1
+
+# Make phenoFile with FID, IID, AFF and PC1, PC2, PC3, PC4.
+# Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt
+awk 'NR>1' $pc/T1DGC_HCE_pc_AMR.txt | awk '{print $1, $2, $3, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $0}' $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_control.txt
+awk '$3==2 {print $0}' $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_case.txt
+
+# Phenotypic data (T1DGC) - IID, enrollment age (control) and age of onset (case)
+awk -F "\"*,\"*" '{print $6, $11, $12}' $release/T1DGC.2011.03_Resources_edited.csv > $input_AMR/T1DGC_HCE_phenotypic_data.txt
+awk -v file=$input_AMR/T1DGC_HCE_phenotypic_data.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_control.txt > $input_AMR/T1DGC_HCE_pc_AMR_pheno_control_edit.txt
+awk -v file=$input_AMR/T1DGC_HCE_phenotypic_data.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_case.txt > $input_AMR/T1DGC_HCE_pc_AMR_pheno_case_edit.txt
+
+# Cases and Controls with AGE of onset or enrollment > 32 have age set as 32
+awk '{if($9>32){print $1, $2, $3, $4, $5, $6, $7, "32", $10}else{print $1, $2, $3, $4, $5, $6, $7, $9, $10}}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_control_edit.txt | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_control_edit2.txt
+awk '{if($10>32){print $1, $2, $3, $4, $5, $6, $7, $9, "32"}else{print $1, $2, $3, $4, $5, $6, $7, $9, $10}}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_case_edit.txt | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_case_edit2.txt
+
+echo "FIID IID AFF PC1 PC2 PC3 PC4 AGE" | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_survival_age.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7, $8}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_control_edit2.txt | sed "s/ /\t/g" >> $input_AMR/T1DGC_HCE_pc_AMR_pheno_survival_age.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7, $9}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_case_edit2.txt | sed "s/ /\t/g" >> $input_AMR/T1DGC_HCE_pc_AMR_pheno_survival_age.txt
+
+## STEP 2
+# Make sample ID file
+
+awk '{print $2}' $release/T1DGC_HCE_cc_AMR-2021-01-20.fam > $input_AMR/sampleID_AMR.txt
+
+# -----------------------------------------------------------------------------------------------------
+
+### AFR
+## STEP 1
+
+# Make phenoFile with FID, IID, AFF and PC1, PC2, PC3, PC4.
+# Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt
+awk 'NR>1' $pc/T1DGC_HCE_pc_AFR.txt | awk '{print $1, $2, $3, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $0}' $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_control.txt
+awk '$3==2 {print $0}' $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_case.txt
+
+# Phenotypic data (T1DGC) - IID, enrollment age (control) and age of onset (case)
+awk -F "\"*,\"*" '{print $6, $11, $12}' $release/T1DGC.2011.03_Resources_edited.csv > $input_AFR/T1DGC_HCE_phenotypic_data.txt
+awk -v file=$input_AFR/T1DGC_HCE_phenotypic_data.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_control.txt > $input_AFR/T1DGC_HCE_pc_AFR_pheno_control_edit.txt
+awk -v file=$input_AFR/T1DGC_HCE_phenotypic_data.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_case.txt > $input_AFR/T1DGC_HCE_pc_AFR_pheno_case_edit.txt
+
+# Cases and Controls with AGE of onset or enrollment > 32 have age set as 32
+awk '{if($9>32){print $1, $2, $3, $4, $5, $6, $7, "32", $10}else{print $1, $2, $3, $4, $5, $6, $7, $9, $10}}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_control_edit.txt | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_control_edit2.txt
+awk '{if($10>32){print $1, $2, $3, $4, $5, $6, $7, $9, "32"}else{print $1, $2, $3, $4, $5, $6, $7, $9, $10}}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_case_edit.txt | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_case_edit2.txt
+
+echo "FIID IID AFF PC1 PC2 PC3 PC4 AGE" | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_survival_age.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7, $8}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_control_edit2.txt | sed "s/ /\t/g" >> $input_AFR/T1DGC_HCE_pc_AFR_pheno_survival_age.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7, $9}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_case_edit2.txt | sed "s/ /\t/g" >> $input_AFR/T1DGC_HCE_pc_AFR_pheno_survival_age.txt
+
+## STEP 2
+# Make sample ID file
+awk '{print $2}' $release/T1DGC_HCE_cc_AFR-2021-01-20.fam > $input_AFR/sampleID_AFR.txt
+
+# -----------------------------------------------------------------------------------------------------
+
+### Pseudo-case control (EUR)
+## STEP 1
+
+# Make phenoFile with FID, IID, AFF and PC1, PC2, PC3, PC4
+# Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt
+awk 'NR>1' $pc/T1DGC_HCE_pc_pseudo_cc_EUR.txt | awk '{print $1, $2, $3, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $0}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control.txt
+awk '$3==2 {print $0}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case.txt
+
+# Phenotypic data (T1DGC) - IID, enrollment age (control) and age of onset (case)
+awk -F "\"*,\"*" '{print $6"_U", $11, $12}' $release/T1DGC.2011.03_Resources_edited.csv > $input_EUR/T1DGC_HCE_phenotypic_data_control.txt
+awk -F "\"*,\"*" '{print $6"_T", $11, $12}' $release/T1DGC.2011.03_Resources_edited.csv > $input_EUR/T1DGC_HCE_phenotypic_data_case.txt
+awk -v file=$input_EUR/T1DGC_HCE_phenotypic_data_control.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control.txt > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit.txt
+awk -v file=$input_EUR/T1DGC_HCE_phenotypic_data_case.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case.txt > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit.txt
+
+# Phenotypic data (GoKinD) - IID, enrollment age (control) and age of onset (case)
+awk '{print $1"_U", $12, $40}' $release/e1a_core_GoKinD_060729_edited.txt > $input_EUR/T1DGC_HCE_phenotypic_data_control_GoKinD.txt
+awk '{print $1"_T", $12, $40}' $release/e1a_core_GoKinD_060729_edited.txt > $input_EUR/T1DGC_HCE_phenotypic_data_case_GoKinD.txt
+awk -v file=$input_EUR/T1DGC_HCE_phenotypic_data_control_GoKinD.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control.txt > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit_GoKinD.txt
+awk -v file=$input_EUR/T1DGC_HCE_phenotypic_data_case_GoKinD.txt 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case.txt > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit_GoKinD.txt
+
+# (remeber that BOTH cases and controls have the same age of onset, because they are pesudo-case controls)
+# we are matching pseudo-cases and pseudo-controls by having the same age
+
+# Cases and Controls with AGE of onset > 32 have age set as 32
+awk '{if($10>32){print $1, $2, $3, $4, $5, $6, $7, "32"}else{print $1, $2, $3, $4, $5, $6, $7, $10}}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit2.txt
+awk '{if($10>32){print $1, $2, $3, $4, $5, $6, $7, "32"}else{print $1, $2, $3, $4, $5, $6, $7, $10}}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit2.txt
+awk '{if($10>32){print $1, $2, $3, $4, $5, $6, $7, "32"}else{print $1, $2, $3, $4, $5, $6, $7, $10}}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit_GoKinD.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit_GoKinD2.txt
+awk '{if($10>32){print $1, $2, $3, $4, $5, $6, $7, "32"}else{print $1, $2, $3, $4, $5, $6, $7, $10}}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit_GoKinD.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit_GoKinD2.txt
+
+echo "FID IID AFF PC1 PC2 PC3 PC4 AGE" | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival_age.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7, $8}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit2.txt | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival_age.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7, $8}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit2.txt | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival_age.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7, $8}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control_edit_GoKinD2.txt | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival_age.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7, $8}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case_edit_GoKinD2.txt | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival_age.txt
+
+## STEP 2
+# Make sample ID file (I used this file because some of the samples did not have phenotypes/age)
+awk '{print $2}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival_age.txt | awk 'NR>1' > $input_EUR/sampleID_pcc_EUR.txt
+
+# Use this one in case of GATE (VCF and sample ID has to have the same number of samples)
+awk '{print $2}' $release/T1DGC_HCE_pseudo_cc_EUR-2021-01-20.fam > $input_EUR/sampleID_pcc_EUR.txt
