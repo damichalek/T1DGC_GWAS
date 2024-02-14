@@ -99,6 +99,15 @@ bash GATE/gate_fullGRM.bsh
 bash HLA/SAIGE/input_saige_hla.bsh
 
 # run SAIGE
+# step 1
+sbatch HLA/SAIGE/saige_HCE_AFR_step1.slurm
+sbatch HLA/SAIGE/saige_HCE_AMR_step1.slurm
+sbatch HLA/SAIGE/saige_HCE_pcc_EUR_step1.slurm
+
+# step2
+sbatch HLA/SAIGE/saige_HCE_AFR_chr6_step2.slurm
+sbatch HLA/SAIGE/saige_HCE_AMR_chr6_step2.slurm
+sbatch HLA/SAIGE/saige_HCE_pcc_EUR_chr6_step2.slurm
 ```
 
 5. HLA association analysis in GATE
