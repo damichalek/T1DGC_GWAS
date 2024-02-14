@@ -114,7 +114,14 @@ sbatch HLA/SAIGE/saige_HCE_pcc_EUR_chr6_step2.slurm
 ```bash
 ```
 
-6. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
+6. HLA meta-analysis in METAL for both T1D risk (SAIGE) and age at onset (GATE)
+```bash
+# uses metal scripts
+bash HLA/SAIGE/hla_saige_fullGRM.bsh
+bash HLA/GATE/hla_gate_fullGRM.bsh
+```
+
+7. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
 ```bash
 ```
 
