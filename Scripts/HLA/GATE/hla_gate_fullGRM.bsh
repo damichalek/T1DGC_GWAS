@@ -1,0 +1,175 @@
+#!/bin/bash
+
+echo "Meta-analysis of HLA imputed region of T1DGC Humancore Exome data, Oct 21 2022, by Dominika Michalek"
+
+# Genome build: GRCh37/hg19 (no liftover)
+# EUR only samples from pseudo-case control dataset
+
+PLINK=plink1.9
+KING=king
+METAL=/m/CPHG/T1DGC/USERS/dam8mt/METAL/generic-metal/metal
+logfile=hla_gate.log
+date > $logfile
+finalname=T1DGC_HCE
+
+AFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/output/AFR
+AMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/output/AMR
+EUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/output/EUR
+
+script=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/GATE/fullGRM_repeated/Script
+
+# Updated version of awk/gawk 5.2
+awkPath=/mnt/t1/local/bin/
+
+# For AFR, AMR, Pseudo-case control meta-analysis (R2 > 0.5, MAF > 0.005, MI < 0.1)
+metalname=metal-2022-08-08
+
+# BETA and SE based meta-analysis
+metalname3=metal-2022-09-05
+
+# For AFR, AMR meta-analysis only  (R2 > 0.5, MAF > 0.005, MI < 0.1)
+metalname2=metal-2022-08-09
+
+# BETA and SE based meta-analysis
+metalname4=metal-2022-09-06
+
+# four digit multi-ethnic reference panel (GRCh37/hg19)
+# These are the VCF and PLINK filtered imputed data (MAF > 0.005, R2 > 0.5, MI < 0.1)
+impAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/AFR
+impAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/AMR
+impEUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/Pseudo_cc/EUR
+imp=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/T1DGC
+
+
+echo -e
+step=1
+echo "Step $step: Prepare files for meta-analysis in METAL (MAF > 0.01)"
+date
+
+# AFR (MAF > 0.005) 
+echo "CHR BP SNP Allele1 Allele2 AF_Allele2 N BETA SE P DIRECTION" | sed "s/ /\t/g" > tmp_gate${step}_AFR_dosage_final.txt
+awk 'NR>1' $AFR/HCE_AFR_age_chr6.GATE.vcf.dosage.txt | awk '{if($10<0){print $1, $2, $3, $4, $5, $7, $9, $10, $11, $13, "-"}else{print $1, $2, $3, $4, $5, $7, $9, $10, $11, $13, "+"}}' | sed "s/ /\t/g" >> tmp_gate${step}_AFR_dosage_final.txt
+
+# AMR (MAF > 0.005) 
+echo "CHR BP SNP Allele1 Allele2 AF_Allele2 N BETA SE P DIRECTION" | sed "s/ /\t/g" > tmp_gate${step}_AMR_dosage_final.txt
+awk 'NR>1' $AMR/HCE_AMR_age_chr6.GATE.vcf.dosage.txt | awk '{if($10<0){print $1, $2, $3, $4, $5, $7, $9, $10, $11, $13, "-"}else{print $1, $2, $3, $4, $5, $7, $9, $10, $11, $13, "+"}}' | sed "s/ /\t/g" >> tmp_gate${step}_AMR_dosage_final.txt
+
+# EUR - Pseudo-case control (MAF > 0.005) 
+echo "CHR BP SNP Allele1 Allele2 AF_Allele2 N BETA SE P DIRECTION" | sed "s/ /\t/g" > tmp_gate${step}_pseudo_cc_EUR_dosage_final.txt
+awk 'NR>1' $EUR/HCE_pcc_EUR_age_chr6.GATE.vcf.dosage.txt | awk '{if($10<0){print $1, $2, $3, $4, $5, $7, $9, $10, $11, $13, "-"}else{print $1, $2, $3, $4, $5, $7, $9, $10, $11, $13, "+"}}' | sed "s/ /\t/g" >> tmp_gate${step}_pseudo_cc_EUR_dosage_final.txt
+
+# Prepare files for HLA-TAPAS (HLAManhattan)
+for val in {AFR,AMR,pseudo_cc_EUR}; do
+  awk '$10 > 0 || $10 < 0 {print $0}' tmp_gate${step}_${val}_dosage_final.txt > tmp_gate${step}_${val}_chr6.assoc.logistic
+done
+
+
+echo -e
+step=2
+echo "Step $step: Run METAL"
+date
+
+# With DIRECTION (+ and -) - DOSAGE
+$METAL $script/${metalname}.txt > ${metalname}.out
+
+echo -e
+step=3
+echo "Step $step: Prepare files for LOCUS ZOOM"
+date
+
+cat $impAFR/T1DGC_HCE_imp_AFR_chr6.bim > tmp_gate${step}_SNPs.txt
+cat '{print 0}' $impAMR/T1DGC_HCE_imp_AMR_chr6.bim >> tmp_gate${step}_SNPs.txt
+cat '{print 0}' $impEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.bim >> tmp_gate${step}_SNPs.txt
+
+# to remove duplicated lines
+# some of the lines are still duplicated, because A1 is switched with A2 (in AFR, AMR or pseudo-case control dataset)
+sort -k 4 tmp_gate${step}_SNPs.txt | uniq | sed "s/ /\t/g" > tmp_gate${step}_SNPs_uniq.txt
+
+# keep unique lines by the 2nd column (SNPs ID) - no duplicated lines
+awk '!seen[$2]++' tmp_gate${step}_SNPs_uniq.txt > tmp_gate${step}_SNPs_uniq_final.txt
+
+awk -v file=${metalname}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' tmp_gate${step}_SNPs_uniq_final.txt > tmp_gate${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 Z P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $11, $12, $13, "chr"$1":"$4}' tmp_gate${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $7, $9}' tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+
+echo -e
+step=4
+echo "Step $step: Run METAL (AFR and AMR) (R2 > 0.5, MAF > 0.005, MI < 0.1)"
+date
+
+# With DIRECTION (+ and -) - DOSAGE
+$METAL $script/${metalname2}.txt > ${metalname2}.out
+
+
+echo -e
+step=5
+step3=$((step-2))
+echo "Step $step: Prepare files for LOCUS ZOOM (AFR and AMR)"
+date
+
+awk -v file=${metalname2}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' tmp_gate${step3}_SNPs_uniq_final.txt > tmp_gate${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 Z P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $11, $12, $13, "chr"$1":"$4}' tmp_gate${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $7, $9}' tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+
+echo -e
+step=6
+echo "Step $step: Run METAL"
+date
+
+# With BETA and SE
+$METAL $script/${metalname3}.txt > ${metalname3}.out
+
+
+echo -e
+step=7
+step3=$((step-4))
+echo "Step $step: Prepare files for LOCUS ZOOM"
+date
+
+awk -v file=${metalname3}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' tmp_gate${step3}_SNPs_uniq_final.txt > tmp_gate${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 AF_A1 BETA SE P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $10, $14, $15, $16, $17, "chr"$1":"$4}' tmp_gate${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $6, $7, $8, $9}' tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_small_final.txt
+
+
+# Prepare file for HLA-TAPAS (HLAManhattan)
+awk '$9 > 0 || $9 < 0 {print $0}' tmp_gate${step}_LOCUS_ZOOM_dosage_small_final.txt > tmp_gate${step}_METAL_chr6.assoc.logistic
+
+# THIS WORKS, but awk path needs to be specified (/mnt/t1/local/bin/)
+echo "CHR SNP BP A1 A2 AF_A1 BETA SE P" | sed "s/ /\t/g" > tmp_gate${step}_METAL_FINAL_chr6.assoc.logistic
+awk 'NR>1' tmp_gate${step}_METAL_chr6.assoc.logistic | $awkPath/awk -M -v PREC=100 '{if($9>=1E-318){print $1, $2, $3, $4, $5, $6, $7, $8, $9}else{print $1, $2, $3, $4, $5, $6, $7, $8, 1E-318}}' | sed "s/ /\t/g" >> tmp_gate${step}_METAL_FINAL_chr6.assoc.logistic
+
+# to remove hidden characters use sed "s/\r//g"
+
+
+echo -e
+step=8
+echo "Step $step: Run METAL (AFR and AMR) (R2 > 0.3, MAF > 0.01, MI < 0.1)"
+date
+
+# With BETA and SE
+$METAL $script/${metalname4}.txt > ${metalname4}.out
+
+
+echo -e
+step=9
+step3=$((step-6))
+echo "Step $step: Prepare files for LOCUS ZOOM"
+date
+
+awk -v file=${metalname4}1.TBL 'BEGIN{while((getline<file)>0)l[$1]=$0}$2 in l{print $0"\t"l[$2]}' tmp_gate${step3}_SNPs_uniq_final.txt > tmp_gate${step}_METAL_dosage_final.txt
+
+echo "CHR SNP BP A1 A2 AF_A1 BETA SE P DIRECTION SNP_LZ" | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+awk '{print $1, $7, $4, $8, $9, $10, $14, $15, $16, $17, "chr"$1":"$4}' tmp_gate${step}_METAL_dosage_final.txt | sed "s/ /\t/g" >> tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt
+
+awk '{print $1, $2, $3, $4, $5, $6, $7, $8, $9}' tmp_gate${step}_LOCUS_ZOOM_dosage_final.txt | sed "s/ /\t/g" > tmp_gate${step}_LOCUS_ZOOM_dosage_small_final.txt
