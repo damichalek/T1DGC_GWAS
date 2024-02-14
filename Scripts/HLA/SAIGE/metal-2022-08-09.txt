@@ -1,0 +1,29 @@
+# Meta-analysis for T1DGC Humancore Exome data, Aug 09, 2022, by Dominika Michalek
+
+# Execute an effect size and standard error based analysis 
+# SCHEME STDERR
+
+# Describe and process the tmp_saige1_AFR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele2 Allele1
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_saige1_AFR_dosage_final.txt
+
+# Describe and process the tmp_saige1_AMR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+WEIGHT N
+ALLELE Allele2 Allele1
+EFFECT DIRECTION
+PVAL P
+
+PROCESS tmp_saige1_AMR_dosage_final.txt
+
+OUTFILE metal-2022-08-09 .TBL
+
+# Execute meta-analysis
+ANALYZE

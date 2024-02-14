@@ -1,0 +1,44 @@
+# Meta-analysis for T1DGC Humancore Exome data, Sep 05, 2022, by Dominika Michalek
+
+# Execute an effect size and standard error based analysis 
+SCHEME STDERR
+
+# To help identify allele flips, it can be useful to track
+# allele frequencies in the meta-analysis
+AVERAGEFREQ ON
+MINMAXFREQ ON
+
+# Describe and process the tmp_saige1_AFR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+ALLELE Allele2 Allele1
+FREQ AF_Allele2
+EFFECT BETA
+STDERR SE
+
+PROCESS tmp_saige1_AFR_dosage_final.txt
+
+# Describe and process the tmp_saige1_AMR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+ALLELE Allele2 Allele1
+FREQ AF_Allele2
+EFFECT BETA
+STDERR SE
+
+PROCESS tmp_saige1_AMR_dosage_final.txt
+
+# Describe and process the tmp_saige1_pseudo_cc_EUR_dosage_final.txt
+SEPARATOR TAB
+MARKER SNP
+ALLELE Allele2 Allele1
+FREQ AF_Allele2
+EFFECT BETA
+STDERR SE
+
+PROCESS tmp_saige1_pseudo_cc_EUR_dosage_final.txt
+
+OUTFILE metal-2022-09-05 .TBL
+
+# Execute meta-analysis
+ANALYZE
