@@ -1,0 +1,81 @@
+#!/bin/bash
+
+echo "Input files for SAIGE analysis of HLA imputed region of T1DGC Humancore Exome data, Oct 17, 2022, by Dominika Michalek"
+
+# Genome build: GRCh37/hg19 (no liftover)
+
+pc=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20/PCs_plink
+
+input_EUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/SAIGE/fullGRM_1.1.2/EUR/input/EUR
+input_AFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/SAIGE/fullGRM_1.1.2/EUR/input/AFR
+input_AMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/SAIGE/fullGRM_1.1.2/EUR/input/AMR
+
+release=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20
+
+### SAIGE genotyped data 
+### AMR
+## STEP 1
+
+# Make phenoFile with FID, IID, AFF and PC1, PC2, PC3, PC4.
+# Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt
+awk 'NR>1' $pc/T1DGC_HCE_pc_AMR.txt | awk '{print $1, $2, $3, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $0}' $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_control.txt
+awk '$3==2 {print $0}' $input_AMR/T1DGC_HCE_pc_AMR_pheno.txt | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_case.txt
+
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_AMR/T1DGC_HCE_pc_AMR_pheno_survival.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_control.txt | sed "s/ /\t/g" >> $input_AMR/T1DGC_HCE_pc_AMR_pheno_survival.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7}' $input_AMR/T1DGC_HCE_pc_AMR_pheno_case.txt | sed "s/ /\t/g" >> $input_AMR/T1DGC_HCE_pc_AMR_pheno_survival.txt
+
+## STEP 2
+# Make sample ID file
+awk '{print $2}' $release/T1DGC_HCE_cc_AMR-2021-01-20.fam > $input_AMR/sampleID_AMR.txt
+
+# -----------------------------------------------------------------------------------------------------
+
+### AFR
+## STEP 1
+
+# Make phenoFile with FID, IID, AFF and PC1, PC2, PC3, PC4.
+# Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt
+awk 'NR>1' $pc/T1DGC_HCE_pc_AFR.txt | awk '{print $1, $2, $3, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $0}' $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_control.txt
+awk '$3==2 {print $0}' $input_AFR/T1DGC_HCE_pc_AFR_pheno.txt | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_case.txt
+
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_AFR/T1DGC_HCE_pc_AFR_pheno_survival.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_control.txt | sed "s/ /\t/g" >> $input_AFR/T1DGC_HCE_pc_AFR_pheno_survival.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7}' $input_AFR/T1DGC_HCE_pc_AFR_pheno_case.txt | sed "s/ /\t/g" >> $input_AFR/T1DGC_HCE_pc_AFR_pheno_survival.txt
+
+## STEP 2
+# Make sample ID file
+awk '{print $2}' $release/T1DGC_HCE_cc_AFR-2021-01-20.fam > $input_AFR/sampleID_AFR.txt
+
+# -----------------------------------------------------------------------------------------------------
+
+### EUR (Pseudo-case control)
+## STEP 1
+
+# Make phenoFile with FID, IID, AFF and PC1, PC2, PC3, PC4
+# Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt
+awk 'NR>1' $pc/T1DGC_HCE_pc_pseudo_cc_EUR.txt | awk '{print $1, $2, $3, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $0}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control.txt
+awk '$3==2 {print $0}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno.txt | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case.txt
+
+echo "FID IID AFF PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival.txt
+awk '{print $1, $2, "0", $4, $5, $6, $7}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_control.txt | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival.txt
+awk '{print $1, $2, "1", $4, $5, $6, $7}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_case.txt | sed "s/ /\t/g" >> $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival.txt
+
+## STEP 2
+# Make sample ID file
+awk '{print $2}' $input_EUR/T1DGC_HCE_pc_pcc_EUR_pheno_survival.txt | awk 'NR>1' > $input_EUR/sampleID_pcc_EUR.txt
+
+# Use this one in case of GATE (VCF and sample ID has to have the same number of samples)
+# awk '{print $2}' $release/T1DGC_HCE_pseudo_cc_EUR-2021-01-20.fam > $input_fam/sampleID_pcc_EUR.txt
