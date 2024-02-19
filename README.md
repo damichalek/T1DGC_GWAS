@@ -137,6 +137,7 @@ bash HLA/GATE/hla_gate_fullGRM.bsh
 7. HLA class II haplotype (_DRB1_-_DQA1_-_DQB1_) analysis
 ```bash
 # run HLAOmnibus test to get bgl phased files
+bash HLA/haplotype_assoc/input_HLAOmnibus.bsh
 bash HLA/haplotype_assoc/run_HLAOmnibus.bsh AFR AMR pseudo_cc_EUR
 ```
 
