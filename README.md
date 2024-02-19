@@ -139,6 +139,10 @@ bash HLA/GATE/hla_gate_fullGRM.bsh
 # run HLAOmnibus test to get bgl phased files
 bash HLA/haplotype_assoc/input_HLAOmnibus.bsh
 bash HLA/haplotype_assoc/run_HLAOmnibus.bsh AFR AMR pseudo_cc_EUR
+
+# get HLA class II haplotypes (uses Cassie's Robertson perl script - get_haplotypes.pl)
+bash HLA/haplotype_assoc/hla_haplotypes.bsh
+
 ```
 
 ## FUMA
