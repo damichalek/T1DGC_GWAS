@@ -1,0 +1,61 @@
+#!/bin/bash
+
+echo "Input files for Omnibus test from T1DGC Humancore Exome data (AFR, AMR, EUR from Pseudo-case control), Feb 13, 2023, by Dominika Michalek"
+
+pc=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/Data_release-2021-01-20/PCs_plink
+input=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA_Omnibus/EUR/input
+vcf=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA_Omnibus/EUR/VCF
+
+###--------------- OMNIBUS TEST ---------------###
+### AFR
+
+### Covariate file
+## Covariate file with FID, IID and PC1, PC2, PC3, PC4
+echo "FID IID PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input/T1DGC_HCE_pc_AFR.pcs
+awk 'NR>1' $pc/T1DGC_HCE_pc_AFR.txt | awk '{print $1, $2, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input/T1DGC_HCE_pc_AFR.pcs
+
+### Phenotype file
+## Phenotype file with FID, IID, AFF (no header)
+## Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control)
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $1, $2, "0"}' $pc/T1DGC_HCE_pc_AFR.txt | sed "s/ /\t/g" > $input/T1DGC_HCE_pheno_AFR.pheno
+awk '$3==2 {print $1, $2, "1"}' $pc/T1DGC_HCE_pc_AFR.txt | sed "s/ /\t/g" >> $input/T1DGC_HCE_pheno_AFR.pheno
+
+# -----------------------------------------------------------------------------------------------------
+
+###--------------- OMNIBUS TEST ---------------###
+### AMR
+
+### Covariate file
+## Covariate file with FID, IID and PC1, PC2, PC3, PC4
+echo "FID IID PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input/T1DGC_HCE_pc_AMR.pcs
+awk 'NR>1' $pc/T1DGC_HCE_pc_AMR.txt | awk '{print $1, $2, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input/T1DGC_HCE_pc_AMR.pcs
+
+### Phenotype file
+## Phenotype file with FID, IID, AFF (no header)
+## Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control)
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $1, $2, "0"}' $pc/T1DGC_HCE_pc_AMR.txt | sed "s/ /\t/g" > $input/T1DGC_HCE_pheno_AMR.pheno
+awk '$3==2 {print $1, $2, "1"}' $pc/T1DGC_HCE_pc_AMR.txt | sed "s/ /\t/g" >> $input/T1DGC_HCE_pheno_AMR.pheno
+
+# -----------------------------------------------------------------------------------------------------
+
+###--------------- OMNIBUS TEST ---------------###
+### EUR (Pseudo-case control)
+
+### Covariate file
+## Covariate file with FID, IID and PC1, PC2, PC3, PC4
+echo "FID IID PC1 PC2 PC3 PC4" | sed "s/ /\t/g" > $input/T1DGC_HCE_pc_pseudo_cc_EUR.pcs
+awk 'NR>1' $pc/T1DGC_HCE_pc_pseudo_cc_EUR.txt | awk '{print $1, $2, $6, $7, $8, $9}' | sed "s/ /\t/g" >> $input/T1DGC_HCE_pc_pseudo_cc_EUR.pcs
+
+### Phenotype file
+## Phenotype file with FID, IID, AFF (no header)
+## Phenotype value ('1' = control, '2' = case, '-9'/'0'/non-numeric = missing data if case/control)
+
+# Change phenotype for 0 (control) and 1 (case)
+awk '$3==1 {print $1, $2, "0"}' $pc/T1DGC_HCE_pc_pseudo_cc_EUR.txt | sed "s/ /\t/g" > $input/T1DGC_HCE_pheno_pseudo_cc_EUR.pheno
+awk '$3==2 {print $1, $2, "1"}' $pc/T1DGC_HCE_pc_pseudo_cc_EUR.txt | sed "s/ /\t/g" >> $input/T1DGC_HCE_pheno_pseudo_cc_EUR.pheno
+
+# -----------------------------------------------------------------------------------------------------
