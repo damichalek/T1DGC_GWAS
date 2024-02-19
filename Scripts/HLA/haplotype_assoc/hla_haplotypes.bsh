@@ -1,0 +1,61 @@
+#!/bin/bash
+
+echo "Get haplotypes, Sep 07, 2022, by Dominika Michalek"
+
+# Genome build: GRCh37/hg19 (no liftover)
+# EUR only samples from pseudo-case control dataset
+
+PLINK=plink1.9
+KING=king
+PERL=perl
+logfile=hla.log
+date > $logfile
+finalname=T1DGC_HCE
+
+inputAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/AFR/input
+outputAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/AFR/output
+inputAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/AMR/input
+outputAMR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/AMR/output
+inputEUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/EUR/input
+outputEUR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/EUR/output
+script=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/Script
+vcfAFR=/m/CPHG/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/four_digit_v2/VCF/AFR
+
+
+### ------ AFR ------ ###
+
+# Extract phased 4-digit alleles from SNP2HLA output - bgl phased file (in my case - HLA_Omnibus test output)
+# add (|| $2 ~ /^HLA_[^_]+\*([0-9]{2}):[0-9]{2}Q$) to include HLA_DQA1*01:07Q
+awk --posix 'NR <=5 || $2 ~ /^HLA_[^_]+\*([0-9]{2}):[0-9]{2}$/' $inputAFR/T1DGC_HCE_imp_AFR_chr6 > $outputAFR/phased_4d.txt
+
+# change HLA marker names from HLA_C*01:02 to HLA_C*0102 (to run PERL script from Cassie)
+awk '{gsub(":","",$2)}1' $outputAFR/phased_4d.txt > $outputAFR/phased_4d_test.txt
+
+# Get haplotypes
+$PERL $script/get_haplotypes.pl --in $outputAFR/phased_4d_test.txt --out $outputAFR/haplotypes.4d.txt --fam $inputAFR/T1DGC_HCE_imp_AFR_chr6.fam &>> $outputAFR/$logfile
+
+
+### ------ AMR ------ ###
+
+# Extract phased 4-digit alleles from SNP2HLA output - bgl phased file
+# add (|| $2 ~ /^HLA_[^_]+\*([0-9]{2}):[0-9]{2}Q$) to include HLA_DQA1*01:07Q
+awk --posix 'NR <=5 || $2 ~ /^HLA_[^_]+\*([0-9]{2}):[0-9]{2}$/' $inputAMR/T1DGC_HCE_imp_AMR_chr6 > $outputAMR/phased_4d.txt
+
+# change HLA marker names from HLA_C*01:02 to HLA_C*0102 (to run PERL script from Cassie)
+awk '{gsub(":","",$2)}1' $outputAMR/phased_4d.txt > $outputAMR/phased_4d_test.txt
+
+# Get haplotypes
+$PERL $script/get_haplotypes.pl --in $outputAMR/phased_4d_test.txt --out $outputAMR/haplotypes.4d.txt --fam $inputAMR/T1DGC_HCE_imp_AMR_chr6.fam &>> $outputAMR/$logfile
+
+
+### ------ pseudo_cc EUR ------ ###
+
+# Extract phased 4-digit alleles from SNP2HLA output - bgl phased file
+# add (|| $2 ~ /^HLA_[^_]+\*([0-9]{2}):[0-9]{2}Q$) to include HLA_DQA1*01:07Q
+awk --posix 'NR <=5 || $2 ~ /^HLA_[^_]+\*([0-9]{2}):[0-9]{2}$/' $inputEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6 > $outputEUR/phased_4d.txt
+
+# change HLA marker names from HLA_C*01:02 to HLA_C*0102 (to run PERL script from Cassie)
+awk '{gsub(":","",$2)}1' $outputEUR/phased_4d.txt > $outputEUR/phased_4d_test.txt
+
+# Get haplotypes
+$PERL $script/get_haplotypes.pl --in $outputEUR/phased_4d_test.txt --out $outputEUR/haplotypes.4d.txt --fam $inputEUR/T1DGC_HCE_imp_pseudo_cc_EUR_chr6.fam &>> $outputEUR/$logfile
