@@ -1,0 +1,35 @@
+#!/bin/bash
+
+echo "HLA Omnibus for T1DGC Humancore Exome data, Feb 13, 2023, by Dominika Michalek"
+
+# Genome build: GRCh37/hg19 (no liftover)
+####### bash /nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA_Omnibus/EUR/Script/run_HLAOmnibus-2023-02-13.bsh AFR AMR pseudo_cc_EUR
+
+module load  gcc/7.1.0  openmpi/3.1.4
+module load R/4.1.1
+module load anaconda
+
+vcf=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA_Omnibus/EUR/input/VCF
+input=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA_Omnibus/EUR/input
+output=/nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA_Omnibus/EUR/output
+
+# use AFR, AMR, pseudo_cc_EUR as an argument
+
+for val in $*; do
+    echo -e
+    step=1
+    echo "Step $step: $val - Omnibus test (four-digit multi-ethnic reference panel v2)"
+    date
+
+    cd /nv/vol185/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/HLA-TAPAS
+
+    python -m HLAassoc OMNIBUS_LOGISTIC \
+        --vcf $vcf/T1DGC_HCE_imp_${val}_chr6.vcf.gz \
+        --bim $vcf/T1DGC_HCE_imp_${val}_chr6.bim \
+        --fam $vcf/T1DGC_HCE_imp_${val}_chr6.fam \
+        --covars $input/T1DGC_HCE_pc_${val}.pcs \
+        --pheno $input/T1DGC_HCE_pheno_${val}.pheno \
+        --out $output/T1DGC_HCE_imp_${val}_chr6.OMNIBUS \
+        --aa-only \
+        --maf-threshold 0.005
+done
