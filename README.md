@@ -145,6 +145,10 @@ bash HLA/haplotype_assoc/run_HLAOmnibus.bsh AFR AMR pseudo_cc_EUR
 # get HLA class II haplotypes (uses Cassie's Robertson perl script - get_haplotypes.pl)
 bash HLA/haplotype_assoc/hla_haplotypes.bsh
 
+# run HLA class II haplotype analysis
+Rscript HLA/haplotype_assoc/haplotype_assoc_AFR.R
+Rscript HLA/haplotype_assoc/haplotype_assoc_AMR.R
+Rscript HLA/haplotype_assoc/haplotype_assoc_EUR.R
 ```
 
 ## FUMA
