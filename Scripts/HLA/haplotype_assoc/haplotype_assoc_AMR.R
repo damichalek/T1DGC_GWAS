@@ -28,19 +28,19 @@ rownames(erlich) <- paste("H", sprintf( '%04d', erlich$DRB1), sprintf( '%04d',er
 
 
 #Create haplotype matrix (Note this takes time -- best to load from file)
-haplotypes = unique(geno$haplotype)
-subjects = unique(geno$IID)
-hapMat = matrix(NA, nrow=length(subjects), ncol=length(haplotypes))
-for (i in 1:length(subjects)) {
-	sub = subjects[i]
-	for (j in 1:length(haplotypes)) {
-		hap = haplotypes[j]
-		hapMat[i, j] = sum(geno$IID==sub & geno$haplotype==hap)
-	}
-}
-rownames(hapMat) <- subjects
-colnames(hapMat) <- paste("H", gsub(":", "_", haplotypes), sep="_")
-save(hapMat, file="hapMat.RData")
+#haplotypes = unique(geno$haplotype)
+#subjects = unique(geno$IID)
+#hapMat = matrix(NA, nrow=length(subjects), ncol=length(haplotypes))
+#for (i in 1:length(subjects)) {
+#	sub = subjects[i]
+#	for (j in 1:length(haplotypes)) {
+#		hap = haplotypes[j]
+#		hapMat[i, j] = sum(geno$IID==sub & geno$haplotype==hap)
+#	}
+#}
+#rownames(hapMat) <- subjects
+#colnames(hapMat) <- paste("H", gsub(":", "_", haplotypes), sep="_")
+#save(hapMat, file="hapMat.RData")
 
 #Get data
 load(file="D:/T1DGC/USERS/dam8mt/data/T1DGC_Humancore_Exome/HLA_imputation/haplotype_analysis/AMR/output/hapMat.RData")
